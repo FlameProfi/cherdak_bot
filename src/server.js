@@ -27,8 +27,10 @@ function setupWebhook(bot) {
         const user = db.getUserByFusionId(fusionClientId);
         if (user) {
           try {
-            const fusionClient = await fusion.getClientDetails(fusionClientId);
-            const totalSpent = fusionClient ? fusionClient.total_buy_sum : (user.total_spent + amount);
+            const rawClient = await fusion.getClientDetails(fusionClientId);
+            const fusionClient = fusion.normalizeClient(rawClient);
+
+            const totalSpent = fusionClient ? fusionClient.total_spent : (user.total_spent + amount);
             const { current, next } = calculateStatus(totalSpent);
 
             db.saveUser({

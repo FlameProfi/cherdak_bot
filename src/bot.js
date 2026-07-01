@@ -55,10 +55,10 @@ bot.action(/gender_(.+)/, async (ctx) => {
   }
 
   try {
-    let fusionClient = await fusion.findClientByPhone(regData.phone);
+    let rawClient = await fusion.findClientByPhone(regData.phone);
 
-    if (!fusionClient) {
-      fusionClient = await fusion.createClient({
+    if (!rawClient) {
+      rawClient = await fusion.createClient({
         first_name: regData.first_name,
         last_name: regData.last_name,
         phone: regData.phone,
@@ -66,14 +66,15 @@ bot.action(/gender_(.+)/, async (ctx) => {
       });
     }
 
-    const { current } = calculateStatus(fusionClient.total_buy_sum || 0);
+    const fusionClient = fusion.normalizeClient(rawClient);
+    const { current } = calculateStatus(fusionClient.total_spent);
 
     db.saveUser({
       telegram_id: ctx.from.id,
       fusion_client_id: fusionClient.id,
-      phone: regData.phone,
-      full_name: `${regData.first_name} ${regData.last_name}`.trim(),
-      total_spent: fusionClient.total_buy_sum || 0,
+      phone: fusionClient.phone,
+      full_name: fusionClient.full_name,
+      total_spent: fusionClient.total_spent,
       current_level: current.name
     });
 
@@ -91,8 +92,10 @@ bot.hears('📇 Моя карта', async (ctx) => {
   if (!user) return ctx.reply('Пожалуйста, пройдите регистрацию /start');
 
   try {
-    const fusionData = await fusion.getClientDetails(user.fusion_client_id);
-    const totalSpent = fusionData ? (fusionData.total_buy_sum || 0) : user.total_spent;
+    const rawData = await fusion.getClientDetails(user.fusion_client_id);
+    const fusionData = fusion.normalizeClient(rawData);
+
+    const totalSpent = fusionData ? fusionData.total_spent : user.total_spent;
     const { current, next } = calculateStatus(totalSpent);
 
     db.saveUser({ ...user, total_spent: totalSpent, current_level: current.name });
