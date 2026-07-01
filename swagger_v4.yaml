@@ -1,0 +1,5611 @@
+openapi: 3.0.0
+info:
+  title: 'FUSIONPOS Api'
+  description: 'Апи для 4 версии проекта'
+  version: '1.0'
+servers:
+  -
+    url: '{domain}api/v1/'
+    description: 'Ваш домен'
+    variables:
+      domain:
+        default: 'https://my-domain.fusionpos.ru/'
+paths:
+  /departments:
+    get:
+      tags:
+        - Department
+      summary: 'Список отделов'
+      description: 'Минимальная роль: авторизованный пользователь. Поддерживает фильтрацию, сортировку и пагинацию.'
+      operationId: c157d659a62b40a78bdeaba1293bcff4
+      parameters:
+        -
+          name: search
+          in: query
+          description: 'Общий поиск по названию'
+          schema:
+            type: string
+        -
+          name: is_deleted
+          in: query
+          description: 'Фильтр по удалённым (`true` / `false`)'
+          schema:
+            type: string
+            default: 'false'
+            enum:
+              - ''
+              - 'true'
+              - 'false'
+        -
+          name: pagination
+          in: query
+          description: 'Пагинация (`false` — вернуть все)'
+          schema:
+            type: string
+            default: 'true'
+            enum:
+              - 'true'
+              - 'false'
+        -
+          name: sort
+          in: query
+          description: 'Поле сортировки, префикс `-` для DESC'
+          schema:
+            type: string
+          examples:
+            name:
+              summary: name
+              value: name
+            '-name':
+              summary: '-name'
+              value: '-name'
+            created_at:
+              summary: created_at
+              value: created_at
+            '-created_at':
+              summary: '-created_at'
+              value: '-created_at'
+        -
+          name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        -
+          name: per-page
+          in: query
+          schema:
+            type: integer
+            default: 25
+        -
+          name: expand
+          in: query
+          description: 'Доступно: `createdBy`, `show_expand`'
+          schema:
+            type: string
+            example: createdBy
+        -
+          name: id
+          in: query
+          description: 'Фильтр по ID'
+          schema:
+            type: integer
+        -
+          name: name
+          in: query
+          description: 'Фильтр по названию (LIKE)'
+          schema:
+            type: string
+        -
+          name: created_by
+          in: query
+          schema:
+            type: integer
+        -
+          name: created_at_start
+          in: query
+          description: 'Фильтр: дата создания от (Y-m-d H:i:s)'
+          schema:
+            type: string
+            format: date-time
+            example: '2026-01-01 00:00:00'
+        -
+          name: created_at_end
+          in: query
+          description: 'Фильтр: дата создания до (Y-m-d H:i:s)'
+          schema:
+            type: string
+            format: date-time
+            example: '2026-12-31 23:59:59'
+        -
+          name: updated_at_start
+          in: query
+          description: 'Фильтр: дата обновления от (Y-m-d H:i:s)'
+          schema:
+            type: string
+            format: date-time
+            example: '2026-01-01 00:00:00'
+        -
+          name: updated_at_end
+          in: query
+          description: 'Фильтр: дата обновления до (Y-m-d H:i:s)'
+          schema:
+            type: string
+            format: date-time
+            example: '2026-12-31 23:59:59'
+        -
+          name: deleted_at_start
+          in: query
+          description: 'Фильтр: дата удаления от (Y-m-d H:i:s)'
+          schema:
+            type: string
+            format: date-time
+            example: '2026-01-01 00:00:00'
+        -
+          name: deleted_at_end
+          in: query
+          description: 'Фильтр: дата удаления до (Y-m-d H:i:s)'
+          schema:
+            type: string
+            format: date-time
+            example: '2026-12-31 23:59:59'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/DepartmentView' } }
+                  _meta: { properties: { totalCount: { type: integer, example: 42 }, pageCount: { type: integer, example: 3 }, currentPage: { type: integer, example: 1 }, perPage: { type: integer, example: 20 } }, type: object }
+                type: object
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - Department
+      summary: Создать
+      description: 'Минимальная роль: menuUpdate'
+      operationId: 88e74d16f3e937b14984bfec8c22c0c0
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DepartmentUpdate'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DepartmentView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+  '/departments/{id}':
+    get:
+      tags:
+        - Department
+      summary: Просмотр
+      description: 'Минимальная роль: menuView'
+      operationId: 7a36ffc0956b05e3a38072cb250de559
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DepartmentView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+    delete:
+      tags:
+        - Department
+      summary: Удалить
+      description: 'Минимальная роль: menuUpdate'
+      operationId: 04b03dd2ac600200dac906403d1c3f8f
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+              example: true
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - Department
+      summary: Обновить
+      description: 'Минимальная роль: menuUpdate'
+      operationId: 3f7aa51218d63f9bfe004af8d57fe692
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DepartmentUpdate'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DepartmentView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+  '/departments/{id}/restore':
+    patch:
+      tags:
+        - Department
+      summary: Восстановить
+      description: 'Минимальная роль: menuUpdate'
+      operationId: 63434ab471fefb724368bf1c1f0a975b
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DepartmentView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+  /halls:
+    get:
+      tags:
+        - Hall
+      summary: 'Список залов'
+      description: 'Минимальная роль: авторизованный пользователь. Поддерживает фильтрацию, сортировку и пагинацию.'
+      operationId: 452a2b63d2143f6f36563c966a920955
+      parameters:
+        -
+          name: search
+          in: query
+          description: 'Общий поиск по названию'
+          schema:
+            type: string
+        -
+          name: is_deleted
+          in: query
+          description: 'Фильтр по удалённым (`true` / `false`)'
+          schema:
+            type: string
+            default: 'false'
+            enum:
+              - ''
+              - 'true'
+              - 'false'
+        -
+          name: pagination
+          in: query
+          description: 'Пагинация (`false` — вернуть все)'
+          schema:
+            type: string
+            default: 'true'
+            enum:
+              - 'true'
+              - 'false'
+        -
+          name: sort
+          in: query
+          description: 'Поле сортировки, префикс `-` для DESC'
+          schema:
+            type: string
+          examples:
+            name:
+              summary: name
+              value: name
+            '-name':
+              summary: '-name'
+              value: '-name'
+            point_id:
+              summary: point_id
+              value: point_id
+            '-point_id':
+              summary: '-point_id'
+              value: '-point_id'
+        -
+          name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        -
+          name: per-page
+          in: query
+          schema:
+            type: integer
+            default: 25
+        -
+          name: expand
+          in: query
+          description: 'Доступно: `point`, `createdBy`, `tables`, `show_expand`'
+          schema:
+            type: string
+            example: 'point,tables'
+        -
+          name: id
+          in: query
+          description: 'Фильтр по ID'
+          schema:
+            type: integer
+        -
+          name: name
+          in: query
+          description: 'Фильтр по названию (LIKE)'
+          schema:
+            type: string
+        -
+          name: point_id
+          in: query
+          description: 'Фильтр по точке продаж'
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/HallView' } }
+                  _meta: { properties: { totalCount: { type: integer, example: 42 }, pageCount: { type: integer, example: 3 }, currentPage: { type: integer, example: 1 }, perPage: { type: integer, example: 20 } }, type: object }
+                type: object
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - Hall
+      summary: Создать
+      description: 'Минимальная роль: pointSettingsUpdate. При создании автоматически генерируются два стола.'
+      operationId: 81d0251674021fea44231723fa8f7a44
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HallUpdate'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HallView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+  '/halls/{id}':
+    get:
+      tags:
+        - Hall
+      summary: Просмотр
+      description: 'Минимальная роль: авторизованный пользователь'
+      operationId: 90e47dbe23c7e6374e2ba82ca00ca62f
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HallView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+    delete:
+      tags:
+        - Hall
+      summary: Удалить
+      description: 'Минимальная роль: pointSettingsUpdate. При удалении каскадно удаляются все столы зала.'
+      operationId: b68ac6bc55148f2e67f7ea81d2be1821
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+              example: true
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - Hall
+      summary: Обновить
+      description: 'Минимальная роль: pointSettingsUpdate'
+      operationId: 6acbff40126a9ee1d0363b5a5ddb85d5
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HallUpdate'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HallView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+  '/halls/{id}/restore':
+    patch:
+      tags:
+        - Hall
+      summary: Восстановить
+      description: 'Минимальная роль: pointSettingsUpdate'
+      operationId: d00ab780f59121f70b0e1c1cfaaca339
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HallView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+  /legal-entities:
+    get:
+      tags:
+        - LegalEntity
+      summary: 'Список юридических лиц'
+      description: 'Минимальная роль: авторизованный пользователь. Поддерживает фильтрацию, сортировку и пагинацию.'
+      operationId: 6e76bcf19f0fc7276114175204afdc4c
+      parameters:
+        -
+          name: search
+          in: query
+          description: 'Общий поиск по названию и обратному наименованию'
+          schema:
+            type: string
+        -
+          name: is_deleted
+          in: query
+          description: 'Фильтр по удалённым (`true` / `false`)'
+          schema:
+            type: string
+            default: 'false'
+            enum:
+              - ''
+              - 'true'
+              - 'false'
+        -
+          name: sort
+          in: query
+          description: 'Поле сортировки, префикс `-` для DESC'
+          schema:
+            type: string
+          examples:
+            name:
+              summary: name
+              value: name
+            '-name':
+              summary: '-name'
+              value: '-name'
+            inn:
+              summary: inn
+              value: inn
+            type:
+              summary: type
+              value: type
+        -
+          name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        -
+          name: per-page
+          in: query
+          schema:
+            type: integer
+            default: 25
+        -
+          name: expand
+          in: query
+          description: 'Доступно: `bankAccounts`, `bankAccounts.bank`, `bankAccounts.currency`'
+          schema:
+            type: string
+            example: bankAccounts
+        -
+          name: id
+          in: query
+          description: 'Фильтр по ID'
+          schema:
+            type: integer
+        -
+          name: uuid
+          in: query
+          schema:
+            type: string
+            format: uuid
+        -
+          name: parent_id
+          in: query
+          schema:
+            type: integer
+        -
+          name: type
+          in: query
+          schema:
+            $ref: '#/components/schemas/LegalEntityTypeEnum'
+        -
+          name: taxation
+          in: query
+          schema:
+            $ref: '#/components/schemas/TaxationEnum'
+        -
+          name: vat
+          in: query
+          schema:
+            $ref: '#/components/schemas/VatEnum'
+        -
+          name: name
+          in: query
+          description: 'Фильтр по названию (LIKE)'
+          schema:
+            type: string
+        -
+          name: inn
+          in: query
+          description: 'Фильтр по ИНН (LIKE)'
+          schema:
+            type: string
+        -
+          name: kpp
+          in: query
+          description: 'Фильтр по КПП (LIKE)'
+          schema:
+            type: string
+        -
+          name: created_at_start
+          in: query
+          description: 'Фильтр: дата создания от (Y-m-d H:i:s)'
+          schema:
+            type: string
+            format: date-time
+            example: '2026-01-01 00:00:00'
+        -
+          name: created_at_end
+          in: query
+          description: 'Фильтр: дата создания до (Y-m-d H:i:s)'
+          schema:
+            type: string
+            format: date-time
+            example: '2026-12-31 23:59:59'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/LegalEntityView' } }
+                  _meta: { properties: { totalCount: { type: integer, example: 42 }, pageCount: { type: integer, example: 3 }, currentPage: { type: integer, example: 1 }, perPage: { type: integer, example: 20 } }, type: object }
+                type: object
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - LegalEntity
+      summary: Создать
+      description: 'Минимальная роль: domainSettingsUpdate'
+      operationId: eb1d77a8f77ab9eed2fe34e0ef3d9a92
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LegalEntityUpdate'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LegalEntityView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+  '/legal-entities/{id}':
+    get:
+      tags:
+        - LegalEntity
+      summary: Просмотр
+      description: 'Минимальная роль: авторизованный пользователь. Принимает числовой ID или UUID.'
+      operationId: 02885f4b4613508fc455ab4daa16cab9
+      parameters:
+        -
+          name: id
+          in: path
+          description: 'Числовой ID или UUID юридического лица'
+          required: true
+          schema:
+            type: string
+          example: 1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LegalEntityView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+    delete:
+      tags:
+        - LegalEntity
+      summary: Удалить
+      description: 'Минимальная роль: domainSettingsUpdate. Запрещено если юр. лицо используется в точках или меню (ошибка 406). Принудительное удаление: `?forceDelete=true`.'
+      operationId: 50fa225ae34d4d005a5eb4cc30f7463a
+      parameters:
+        -
+          name: id
+          in: path
+          description: 'Числовой ID или UUID'
+          required: true
+          schema:
+            type: string
+          example: 1
+        -
+          name: forceDelete
+          in: query
+          description: 'Принудительное удаление даже если юр. лицо используется'
+          schema:
+            type: string
+            enum:
+              - 'true'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+              example: true
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - LegalEntity
+      summary: Обновить
+      description: 'Минимальная роль: domainSettingsUpdate'
+      operationId: 96308f423a4ebdc8cd250ed0d5008515
+      parameters:
+        -
+          name: id
+          in: path
+          description: 'Числовой ID или UUID'
+          required: true
+          schema:
+            type: string
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LegalEntityUpdate'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LegalEntityView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+  '/legal-entities/{id}/restore':
+    patch:
+      tags:
+        - LegalEntity
+      summary: Восстановить
+      description: 'Минимальная роль: domainSettingsUpdate'
+      operationId: b27f9f725956f3e8ffb2a717b8bd5b7d
+      parameters:
+        -
+          name: id
+          in: path
+          description: 'Числовой ID или UUID'
+          required: true
+          schema:
+            type: string
+          example: 1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LegalEntityView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+  /menu-categories:
+    get:
+      tags:
+        - MenuCategory
+      summary: 'Список категорий меню'
+      description: 'Минимальная роль: авторизованный пользователь. Поддерживает фильтрацию, сортировку и пагинацию.'
+      operationId: 7c76060f9f3d1d2e0049bd425101ae5f
+      parameters:
+        -
+          name: search
+          in: query
+          description: 'Общий поиск'
+          schema:
+            type: string
+        -
+          name: is_deleted
+          in: query
+          description: 'Фильтр по удалённым (`true` / `false`)'
+          schema:
+            type: string
+            default: 'false'
+            enum:
+              - ''
+              - 'true'
+              - 'false'
+        -
+          name: pagination
+          in: query
+          description: 'Пагинация (`false` — вернуть все)'
+          schema:
+            type: string
+            default: 'true'
+            enum:
+              - 'true'
+              - 'false'
+        -
+          name: sort
+          in: query
+          description: 'Поле сортировки, префикс `-` для DESC'
+          schema:
+            type: string
+          examples:
+            name:
+              summary: name
+              value: name
+            '-name':
+              summary: '-name'
+              value: '-name'
+        -
+          name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        -
+          name: per-page
+          in: query
+          schema:
+            type: integer
+            default: 25
+        -
+          name: expand
+          in: query
+          description: 'Доступно: `parent`, `children`, `menus`, `createdBy`, `show_expand`'
+          schema:
+            type: string
+            example: 'children,menus'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/MenuCategoryView' } }
+                  _meta: { properties: { totalCount: { type: integer, example: 42 }, pageCount: { type: integer, example: 3 }, currentPage: { type: integer, example: 1 }, perPage: { type: integer, example: 20 } }, type: object }
+                type: object
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+  '/menu-categories/{id}':
+    get:
+      tags:
+        - MenuCategory
+      summary: Просмотр
+      description: 'Минимальная роль: авторизованный пользователь'
+      operationId: 1b17df11b9312e6a345c13b470ad8b8b
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MenuCategoryView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - MenuCategory
+      summary: Создать
+      description: 'Минимальная роль: menuUpdate'
+      operationId: 2d67ae7717d2c04c7c7f3391f6e8b46a
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MenuCategoryUpdate'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MenuCategoryView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+    delete:
+      tags:
+        - MenuCategory
+      summary: Удалить
+      description: 'Минимальная роль: menuUpdate'
+      operationId: cc965a8b31f192021506fc5a6141476e
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+              example: true
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - MenuCategory
+      summary: Обновить
+      description: 'Минимальная роль: menuUpdate'
+      operationId: d5ed9d4d39498d1ed83bb69f57ed9acb
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MenuCategoryUpdate'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MenuCategoryView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+  '/menu-categories/{id}/restore':
+    patch:
+      tags:
+        - MenuCategory
+      summary: Восстановить
+      description: 'Минимальная роль: menuUpdate'
+      operationId: d6e6b26c181ce613ffc9e6d2db0705cb
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MenuCategoryView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+  /menus:
+    get:
+      tags:
+        - Menu
+      summary: 'Список позиций меню'
+      description: 'Минимальная роль: авторизованный пользователь. Поддерживает фильтрацию, сортировку и пагинацию.'
+      operationId: 1f8cde3cb3aabdfdabf5e4c956ed32aa
+      parameters:
+        -
+          name: search
+          in: query
+          description: 'Общий поиск по названию позиции и категории'
+          schema:
+            type: string
+        -
+          name: is_deleted
+          in: query
+          description: 'Фильтр по удалённым (`true` / `false`)'
+          schema:
+            type: string
+            default: 'false'
+            enum:
+              - ''
+              - 'true'
+              - 'false'
+        -
+          name: pagination
+          in: query
+          description: 'Пагинация (`false` — вернуть все)'
+          schema:
+            type: string
+            default: 'true'
+            enum:
+              - 'true'
+              - 'false'
+        -
+          name: sort
+          in: query
+          description: 'Поле сортировки, префикс `-` для DESC'
+          schema:
+            type: string
+          examples:
+            name:
+              summary: name
+              value: name
+            '-name':
+              summary: '-name'
+              value: '-name'
+            category.name:
+              summary: category.name
+              value: category.name
+        -
+          name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        -
+          name: per-page
+          in: query
+          schema:
+            type: integer
+            default: 25
+        -
+          name: expand
+          in: query
+          description: 'Доступно: `category`, `nomenclature`, `kktPaymentObject`, `department`, `measurementUnit`, `createdBy`, `favoriteBy`, `stoppedBy`, `menuToPoints`, `barcodes`, `canChangeNomenclature`, `show_expand`'
+          schema:
+            type: string
+            example: 'category,barcodes'
+        -
+          name: id
+          in: query
+          description: 'Фильтр по ID'
+          schema:
+            type: integer
+        -
+          name: name
+          in: query
+          description: 'Фильтр по названию (LIKE)'
+          schema:
+            type: string
+        -
+          name: category_id
+          in: query
+          description: 'Фильтр по категории (`null` — без категории)'
+          schema:
+            type: string
+            example: '1'
+        -
+          name: nomenclature_id
+          in: query
+          schema:
+            type: integer
+        -
+          name: kkt_payment_object_id
+          in: query
+          schema:
+            type: integer
+        -
+          name: vat
+          in: query
+          description: 'Фильтр по ставке НДС'
+          schema:
+            $ref: '#/components/schemas/VatEnum'
+        -
+          name: department_id
+          in: query
+          schema:
+            type: integer
+        -
+          name: price
+          in: query
+          description: 'Фильтр по цене рублях'
+          schema:
+            type: integer
+        -
+          name: is_active
+          in: query
+          schema:
+            type: string
+            enum:
+              - ''
+              - 'true'
+              - 'false'
+        -
+          name: is_bulk
+          in: query
+          schema:
+            type: string
+            enum:
+              - ''
+              - 'true'
+              - 'false'
+        -
+          name: is_favorite
+          in: query
+          schema:
+            type: string
+            enum:
+              - ''
+              - 'true'
+              - 'false'
+        -
+          name: is_stopped
+          in: query
+          schema:
+            type: string
+            enum:
+              - ''
+              - 'true'
+              - 'false'
+        -
+          name: available_external_orders
+          in: query
+          schema:
+            type: string
+            enum:
+              - ''
+              - 'true'
+              - 'false'
+        -
+          name: measurement_unit_id
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/MenuView' } }
+                  _meta: { properties: { totalCount: { type: integer, example: 42 }, pageCount: { type: integer, example: 3 }, currentPage: { type: integer, example: 1 }, perPage: { type: integer, example: 20 } }, type: object }
+                type: object
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - Menu
+      summary: Создать
+      description: 'Минимальная роль: menuUpdate'
+      operationId: 1b722258e0fa42b78151d65f2e4a8cea
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MenuUpdate'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MenuView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+  '/menus/{id}':
+    get:
+      tags:
+        - Menu
+      summary: Просмотр
+      description: 'Минимальная роль: menuView'
+      operationId: 69815bf68ce807338cbe57208a2a9fa8
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MenuView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+    delete:
+      tags:
+        - Menu
+      summary: Удалить
+      description: 'Минимальная роль: menuUpdate'
+      operationId: afb7760b5b32621110fd5fd10b90adb3
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+              example: true
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - Menu
+      summary: Обновить
+      description: 'Минимальная роль: menuUpdate'
+      operationId: e65d466db8fe37cf071eab6a53a82a0d
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MenuUpdate'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MenuView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+  '/menus/{id}/restore':
+    patch:
+      tags:
+        - Menu
+      summary: Восстановить
+      description: 'Минимальная роль: menuUpdate'
+      operationId: f326add1ae7405a94b917d7bee82749d
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MenuView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+  /nomenclature-categories:
+    get:
+      tags:
+        - NomenclatureCategory
+      summary: 'Список категорий номенклатуры'
+      description: 'Минимальная роль: авторизованный пользователь. Поддерживает фильтрацию, сортировку и пагинацию.'
+      operationId: 7f6cfcdb3235f6f78b2d727fa27d0ab3
+      parameters:
+        -
+          name: search
+          in: query
+          description: 'Общий поиск по названию'
+          schema:
+            type: string
+        -
+          name: is_deleted
+          in: query
+          description: 'Фильтр по удалённым (`true` / `false`)'
+          schema:
+            type: string
+            default: 'false'
+            enum:
+              - ''
+              - 'true'
+              - 'false'
+        -
+          name: pagination
+          in: query
+          description: 'Пагинация (`false` — вернуть все)'
+          schema:
+            type: string
+            default: 'true'
+            enum:
+              - 'true'
+              - 'false'
+        -
+          name: sort
+          in: query
+          description: 'Поле сортировки, префикс `-` для DESC'
+          schema:
+            type: string
+          examples:
+            name:
+              summary: name
+              value: name
+            '-name':
+              summary: '-name'
+              value: '-name'
+        -
+          name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        -
+          name: per-page
+          in: query
+          schema:
+            type: integer
+            default: 25
+        -
+          name: expand
+          in: query
+          description: 'Доступно: `parent`, `children`, `nomenclatures`, `createdBy`, `show_expand`'
+          schema:
+            type: string
+            example: 'children,nomenclatures'
+        -
+          name: id
+          in: query
+          description: 'Фильтр по ID'
+          schema:
+            type: integer
+        -
+          name: parent_id
+          in: query
+          description: 'Фильтр по родительской категории (`null` — корневые)'
+          schema:
+            type: string
+            example: '1'
+        -
+          name: name
+          in: query
+          description: 'Фильтр по названию (LIKE)'
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/NomenclatureCategoryView' } }
+                  _meta: { properties: { totalCount: { type: integer, example: 42 }, pageCount: { type: integer, example: 3 }, currentPage: { type: integer, example: 1 }, perPage: { type: integer, example: 20 } }, type: object }
+                type: object
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - NomenclatureCategory
+      summary: Создать
+      description: 'Минимальная роль: menuUpdate или warehouseUpdate'
+      operationId: 15c54936f029d94005503087166acf50
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NomenclatureCategoryUpdate'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NomenclatureCategoryView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+  '/nomenclature-categories/{id}':
+    get:
+      tags:
+        - NomenclatureCategory
+      summary: Просмотр
+      description: 'Минимальная роль: menuView или warehouseView'
+      operationId: d3ec1b042a4f54aac0be8d950d7bf2cc
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NomenclatureCategoryView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+    delete:
+      tags:
+        - NomenclatureCategory
+      summary: Удалить
+      description: 'Минимальная роль: menuUpdate или warehouseUpdate. Нельзя удалить если категория содержит позиции или дочерние категории.'
+      operationId: 54bb40c1c94aea7e1afad5df15d81993
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+              example: true
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - NomenclatureCategory
+      summary: Обновить
+      description: 'Минимальная роль: menuUpdate или warehouseUpdate'
+      operationId: 52c2defdaf8e8bd6831405d4729254f8
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NomenclatureCategoryUpdate'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NomenclatureCategoryView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+  '/nomenclature-categories/{id}/restore':
+    patch:
+      tags:
+        - NomenclatureCategory
+      summary: Восстановить
+      description: 'Минимальная роль: menuUpdate или warehouseUpdate'
+      operationId: 630e4a7851445bdf3667d0bb27cfaaa0
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NomenclatureCategoryView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+  /nomenclatures:
+    get:
+      tags:
+        - Nomenclature
+      summary: 'Список номенклатуры'
+      description: 'Минимальная роль: авторизованный пользователь. Поддерживает фильтрацию, сортировку и пагинацию.'
+      operationId: 6ba1b710589a9af89646a5b0d64ce433
+      parameters:
+        -
+          name: search
+          in: query
+          description: 'Общий поиск по названию и описанию'
+          schema:
+            type: string
+        -
+          name: is_deleted
+          in: query
+          description: 'Фильтр по удалённым (`true` / `false`)'
+          schema:
+            type: string
+            default: 'false'
+            enum:
+              - ''
+              - 'true'
+              - 'false'
+        -
+          name: pagination
+          in: query
+          description: 'Пагинация (`false` — вернуть все)'
+          schema:
+            type: string
+            default: 'true'
+            enum:
+              - 'true'
+              - 'false'
+        -
+          name: for_warehouse
+          in: query
+          description: 'Фильтр: только типы пригодные для склада (`true`)'
+          schema:
+            type: string
+            enum:
+              - ''
+              - 'true'
+              - 'false'
+        -
+          name: sort
+          in: query
+          description: 'Поле сортировки, префикс `-` для DESC'
+          schema:
+            type: string
+          examples:
+            name:
+              summary: name
+              value: name
+            '-name':
+              summary: '-name'
+              value: '-name'
+            type:
+              summary: type
+              value: type
+        -
+          name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        -
+          name: per-page
+          in: query
+          schema:
+            type: integer
+            default: 25
+        -
+          name: expand
+          in: query
+          description: 'Доступно: `category`, `measurementUnit`, `createdBy`, `warehouseRemainings`, `recipes`, `barcodes`, `nomenclaturePackagings`, `canChangeType`, `show_expand`'
+          schema:
+            type: string
+            example: 'category,barcodes'
+        -
+          name: id
+          in: query
+          description: 'Фильтр по ID'
+          schema:
+            type: integer
+        -
+          name: uuid
+          in: query
+          schema:
+            type: string
+            format: uuid
+        -
+          name: name
+          in: query
+          description: 'Фильтр по названию (LIKE)'
+          schema:
+            type: string
+        -
+          name: category_id
+          in: query
+          description: 'Фильтр по категории (`null` — без категории)'
+          schema:
+            type: string
+            example: '1'
+        -
+          name: category_ids
+          in: query
+          description: 'Фильтр по нескольким категориям (через запятую)'
+          schema:
+            type: string
+            example: '1,2,3'
+        -
+          name: type
+          in: query
+          description: 'Фильтр по типу'
+          schema:
+            $ref: '#/components/schemas/NomenclatureTypeEnum'
+        -
+          name: sale_specification
+          in: query
+          schema:
+            $ref: '#/components/schemas/NomenclatureSaleSpecificationEnum'
+        -
+          name: measurement_unit_id
+          in: query
+          schema:
+            type: integer
+        -
+          name: base_price
+          in: query
+          description: 'Фильтр по базовой цене (в копейках)'
+          schema:
+            type: integer
+        -
+          name: excise
+          in: query
+          schema:
+            $ref: '#/components/schemas/NomenclatureExciseEnum'
+        -
+          name: scale_name
+          in: query
+          schema:
+            $ref: '#/components/schemas/ScaleNameEnum'
+        -
+          name: food_specification
+          in: query
+          schema:
+            $ref: '#/components/schemas/FoodSpecificationEnum'
+        -
+          name: food_spiciness
+          in: query
+          schema:
+            $ref: '#/components/schemas/FoodSpicinessEnum'
+        -
+          name: cooking_method
+          in: query
+          schema:
+            $ref: '#/components/schemas/CookingMethodEnum'
+        -
+          name: food_portion
+          in: query
+          schema:
+            $ref: '#/components/schemas/FoodPortionEnum'
+        -
+          name: description
+          in: query
+          description: 'Фильтр по описанию (LIKE)'
+          schema:
+            type: string
+        -
+          name: created_by
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/NomenclatureView' } }
+                  _meta: { properties: { totalCount: { type: integer, example: 42 }, pageCount: { type: integer, example: 3 }, currentPage: { type: integer, example: 1 }, perPage: { type: integer, example: 20 } }, type: object }
+                type: object
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - Nomenclature
+      summary: Создать
+      description: 'Минимальная роль: menuUpdate или warehouseUpdate'
+      operationId: ca944663cae6988ee4b754ff23656191
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NomenclatureUpdate'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NomenclatureView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+  '/nomenclatures/{id}':
+    get:
+      tags:
+        - Nomenclature
+      summary: Просмотр
+      description: 'Минимальная роль: menuView или warehouseView'
+      operationId: 381800f7cb0942bc3fc4baaff295722e
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NomenclatureView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+    delete:
+      tags:
+        - Nomenclature
+      summary: Удалить
+      description: 'Минимальная роль: menuUpdate или warehouseUpdate'
+      operationId: 07a8bbb6f7c95eedea87e8be44bf049c
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+              example: true
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - Nomenclature
+      summary: Обновить
+      description: 'Минимальная роль: menuUpdate или warehouseUpdate'
+      operationId: d46338e9272a3fd63d5e26068196b193
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NomenclatureUpdate'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NomenclatureView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+  '/nomenclatures/{id}/restore':
+    patch:
+      tags:
+        - Nomenclature
+      summary: Восстановить
+      description: 'Минимальная роль: menuUpdate или warehouseUpdate'
+      operationId: 15403750a8cca143e6a9d245c50806e6
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NomenclatureView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+  /points:
+    get:
+      tags:
+        - Point
+      summary: 'Список точек продаж'
+      description: 'Минимальная роль: авторизованный пользователь. Возвращает только точки, доступные текущему пользователю. Поддерживает фильтрацию, сортировку и пагинацию.'
+      operationId: 67684079ad19707100afa335d97961e9
+      parameters:
+        -
+          name: search
+          in: query
+          description: 'Общий поиск по названию и адресу'
+          schema:
+            type: string
+        -
+          name: is_deleted
+          in: query
+          description: 'Фильтр по удалённым (`true` / `false`)'
+          schema:
+            type: string
+            default: 'false'
+            enum:
+              - ''
+              - 'true'
+              - 'false'
+        -
+          name: sort
+          in: query
+          description: 'Поле сортировки, префикс `-` для DESC'
+          schema:
+            type: string
+          examples:
+            name:
+              summary: name
+              value: name
+            '-name':
+              summary: '-name'
+              value: '-name'
+            is_active:
+              summary: is_active
+              value: is_active
+        -
+          name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        -
+          name: per-page
+          in: query
+          schema:
+            type: integer
+            default: 25
+        -
+          name: expand
+          in: query
+          description: 'Доступно: `warehouse`, `legalEntity`, `createdBy`, `warehouses`, `orderStatusPoints`, `show_expand`'
+          schema:
+            type: string
+            example: 'warehouse,legalEntity'
+        -
+          name: id
+          in: query
+          description: 'Фильтр по ID'
+          schema:
+            type: integer
+        -
+          name: uuid
+          in: query
+          schema:
+            type: string
+            format: uuid
+        -
+          name: name
+          in: query
+          description: 'Фильтр по названию (LIKE)'
+          schema:
+            type: string
+        -
+          name: address
+          in: query
+          description: 'Фильтр по адресу (LIKE)'
+          schema:
+            type: string
+        -
+          name: legal_entity_uuid
+          in: query
+          schema:
+            type: string
+            format: uuid
+        -
+          name: warehouse_id
+          in: query
+          schema:
+            type: integer
+        -
+          name: is_active
+          in: query
+          schema:
+            type: string
+            enum:
+              - ''
+              - 'true'
+              - 'false'
+        -
+          name: taxation
+          in: query
+          schema:
+            $ref: '#/components/schemas/TaxationEnum'
+        -
+          name: vat
+          in: query
+          schema:
+            $ref: '#/components/schemas/VatEnum'
+        -
+          name: payment_schema
+          in: query
+          schema:
+            $ref: '#/components/schemas/PointPaymentSchemaEnum'
+        -
+          name: produce_schema
+          in: query
+          schema:
+            $ref: '#/components/schemas/PointProduceSchemaEnum'
+        -
+          name: is_module_tables
+          in: query
+          schema:
+            type: string
+            enum:
+              - ''
+              - 'true'
+              - 'false'
+        -
+          name: is_module_waiter
+          in: query
+          schema:
+            type: string
+            enum:
+              - ''
+              - 'true'
+              - 'false'
+        -
+          name: is_module_finance
+          in: query
+          schema:
+            type: string
+            enum:
+              - ''
+              - 'true'
+              - 'false'
+        -
+          name: excludeIds
+          in: query
+          description: 'Исключить точки по ID (через запятую)'
+          schema:
+            type: string
+            example: '1,2,3'
+        -
+          name: created_at_start
+          in: query
+          description: 'Фильтр: дата создания от (Y-m-d H:i:s)'
+          schema:
+            type: string
+            format: date-time
+            example: '2026-01-01 00:00:00'
+        -
+          name: created_at_end
+          in: query
+          description: 'Фильтр: дата создания до (Y-m-d H:i:s)'
+          schema:
+            type: string
+            format: date-time
+            example: '2026-12-31 23:59:59'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/PointView' } }
+                  _meta: { properties: { totalCount: { type: integer, example: 42 }, pageCount: { type: integer, example: 3 }, currentPage: { type: integer, example: 1 }, perPage: { type: integer, example: 20 } }, type: object }
+                type: object
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+  '/points/{id}':
+    get:
+      tags:
+        - Point
+      summary: Просмотр
+      description: 'Минимальная роль: domainSettingsView или pointSettingsView'
+      operationId: e8e31208b8e1e5be526c424df430c965
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PointView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - Point
+      summary: Обновить
+      description: 'Минимальная роль: domainSettingsUpdate или pointSettingsUpdate. Поля `mqtt_*` доступны только роли support.'
+      operationId: c2b8922d32db1dc68c157fcdbc001ad6
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PointUpdate'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PointView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+  '/points/{id}/restore':
+    patch:
+      tags:
+        - Point
+      summary: Восстановить
+      description: 'Минимальная роль: domainSettingsUpdate или pointSettingsUpdate'
+      operationId: 36222122f3fb2f38042d0d2f913f9117
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PointView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+  /suppliers:
+    get:
+      tags:
+        - Supplier
+      summary: 'Список поставщиков'
+      description: 'Минимальная роль: авторизованный пользователь. Поддерживает фильтрацию, сортировку и пагинацию.'
+      operationId: db387e65c38a182ccc8cff110699dd5c
+      parameters:
+        -
+          name: search
+          in: query
+          description: 'Общий поиск по названию, телефону, ИНН, email, имени, фамилии, отчеству, адресам'
+          schema:
+            type: string
+        -
+          name: is_deleted
+          in: query
+          description: 'Фильтр по удалённым (`true` / `false`)'
+          schema:
+            type: string
+            default: 'false'
+            enum:
+              - ''
+              - 'true'
+              - 'false'
+        -
+          name: sort
+          in: query
+          description: 'Поле сортировки, префикс `-` для DESC'
+          schema:
+            type: string
+          examples:
+            name:
+              summary: name
+              value: name
+            '-name':
+              summary: '-name'
+              value: '-name'
+            inn:
+              summary: inn
+              value: inn
+            balance:
+              summary: balance
+              value: balance
+        -
+          name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        -
+          name: per-page
+          in: query
+          schema:
+            type: integer
+            default: 25
+        -
+          name: expand
+          in: query
+          description: 'Доступно: `bankAccounts`, `createdBy`, `show_expand`'
+          schema:
+            type: string
+            example: bankAccounts
+        -
+          name: id
+          in: query
+          description: 'Фильтр по ID'
+          schema:
+            type: integer
+        -
+          name: uuid
+          in: query
+          schema:
+            type: string
+            format: uuid
+        -
+          name: name
+          in: query
+          description: 'Фильтр по названию (LIKE)'
+          schema:
+            type: string
+        -
+          name: inn
+          in: query
+          description: 'Фильтр по ИНН (LIKE)'
+          schema:
+            type: string
+        -
+          name: phone
+          in: query
+          description: 'Фильтр по телефону (LIKE)'
+          schema:
+            type: string
+        -
+          name: email
+          in: query
+          description: 'Фильтр по email (LIKE)'
+          schema:
+            type: string
+        -
+          name: type
+          in: query
+          schema:
+            $ref: '#/components/schemas/LegalEntityTypeEnum'
+        -
+          name: parent_id
+          in: query
+          schema:
+            type: integer
+        -
+          name: created_at_start
+          in: query
+          description: 'Фильтр: дата создания от (Y-m-d H:i:s)'
+          schema:
+            type: string
+            format: date-time
+            example: '2026-01-01 00:00:00'
+        -
+          name: created_at_end
+          in: query
+          description: 'Фильтр: дата создания до (Y-m-d H:i:s)'
+          schema:
+            type: string
+            format: date-time
+            example: '2026-12-31 23:59:59'
+        -
+          name: updated_at_start
+          in: query
+          description: 'Фильтр: дата обновления от (Y-m-d H:i:s)'
+          schema:
+            type: string
+            format: date-time
+            example: '2026-01-01 00:00:00'
+        -
+          name: updated_at_end
+          in: query
+          description: 'Фильтр: дата обновления до (Y-m-d H:i:s)'
+          schema:
+            type: string
+            format: date-time
+            example: '2026-12-31 23:59:59'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/SupplierView' } }
+                  _meta: { properties: { totalCount: { type: integer, example: 42 }, pageCount: { type: integer, example: 3 }, currentPage: { type: integer, example: 1 }, perPage: { type: integer, example: 20 } }, type: object }
+                type: object
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - Supplier
+      summary: Создать
+      description: 'Минимальная роль: warehouseUpdate'
+      operationId: 5bb6d92ee8b8c32a249c99536e477b02
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SupplierUpdate'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupplierView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+  '/suppliers/{id}':
+    get:
+      tags:
+        - Supplier
+      summary: Просмотр
+      description: 'Минимальная роль: warehouseView'
+      operationId: 93e1ea4187a56be774e1ba5626079c20
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupplierView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+    delete:
+      tags:
+        - Supplier
+      summary: Удалить
+      description: 'Минимальная роль: warehouseUpdate'
+      operationId: b63634ea88ad4a8a51753c94c2a0cf9d
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+              example: true
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - Supplier
+      summary: Обновить
+      description: 'Минимальная роль: warehouseUpdate'
+      operationId: 567301093ab2f017de153bba733ebe7c
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SupplierUpdate'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupplierView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+  '/suppliers/{id}/restore':
+    patch:
+      tags:
+        - Supplier
+      summary: Восстановить
+      description: 'Минимальная роль: warehouseUpdate'
+      operationId: 5ec0ab8956364da77c362e7ce8edeb61
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupplierView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+  /tables:
+    get:
+      tags:
+        - Table
+      summary: 'Список столов'
+      description: 'Минимальная роль: авторизованный пользователь. Поддерживает фильтрацию, сортировку и пагинацию.'
+      operationId: 0ffcb8cabc8b0f2dcf9e679ba2f669d2
+      parameters:
+        -
+          name: search
+          in: query
+          description: 'Общий поиск по названию'
+          schema:
+            type: string
+        -
+          name: is_deleted
+          in: query
+          description: 'Фильтр по удалённым (`true` / `false`)'
+          schema:
+            type: string
+            default: 'false'
+            enum:
+              - ''
+              - 'true'
+              - 'false'
+        -
+          name: pagination
+          in: query
+          description: 'Пагинация (`false` — вернуть все)'
+          schema:
+            type: string
+            default: 'true'
+            enum:
+              - 'true'
+              - 'false'
+        -
+          name: sort
+          in: query
+          description: 'Поле сортировки, префикс `-` для DESC'
+          schema:
+            type: string
+          examples:
+            name:
+              summary: name
+              value: name
+            '-name':
+              summary: '-name'
+              value: '-name'
+            hall_id:
+              summary: hall_id
+              value: hall_id
+            '-hall_id':
+              summary: '-hall_id'
+              value: '-hall_id'
+        -
+          name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        -
+          name: per-page
+          in: query
+          schema:
+            type: integer
+            default: 25
+        -
+          name: expand
+          in: query
+          description: 'Доступно: `hall`, `createdBy`, `show_expand`'
+          schema:
+            type: string
+            example: 'hall,createdBy'
+        -
+          name: id
+          in: query
+          description: 'Фильтр по ID'
+          schema:
+            type: integer
+        -
+          name: name
+          in: query
+          description: 'Фильтр по названию (LIKE)'
+          schema:
+            type: string
+        -
+          name: hall_id
+          in: query
+          description: 'Фильтр по залу'
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/TableView' } }
+                  _meta: { properties: { totalCount: { type: integer, example: 42 }, pageCount: { type: integer, example: 3 }, currentPage: { type: integer, example: 1 }, perPage: { type: integer, example: 20 } }, type: object }
+                type: object
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - Table
+      summary: Создать
+      description: 'Минимальная роль: pointSettingsUpdate'
+      operationId: 98432c0a3767c83a51c71ba547ff2c13
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TableUpdate'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TableView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+  '/tables/{id}':
+    get:
+      tags:
+        - Table
+      summary: Просмотр
+      description: 'Минимальная роль: авторизованный пользователь'
+      operationId: 42078fd510e9018a579dbef308ebc3d1
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TableView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+    delete:
+      tags:
+        - Table
+      summary: Удалить
+      description: 'Минимальная роль: pointSettingsUpdate'
+      operationId: 0fa292709ad1f10e2e53c03aad56887a
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+              example: true
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - Table
+      summary: Обновить
+      description: 'Минимальная роль: pointSettingsUpdate'
+      operationId: 4eb4b8136d7cb37794eddbaa021601f5
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TableUpdate'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TableView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+  '/tables/{id}/restore':
+    patch:
+      tags:
+        - Table
+      summary: Восстановить
+      description: 'Минимальная роль: pointSettingsUpdate'
+      operationId: 7f6d077537e9474a5aa2d3f43a4c7227
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TableView'
+        '401':
+          description: 'Не авторизован'
+        '403':
+          description: 'Доступ запрещён'
+        '404':
+          description: 'Не найдено'
+        '406':
+          description: 'Ошибка процесса сохранения'
+        '422':
+          description: 'Ошибка валидации'
+        '500':
+          description: 'Ошибка сервера'
+      security:
+        -
+          bearerAuth: []
+components:
+  schemas:
+    AcquiringTypeEnum:
+      type: string
+      enum:
+        - sber
+        - yalunch
+        - yapay
+        - smartsale
+    AuthItemEnum:
+      type: string
+      enum:
+        - analyticsUpdate
+        - analyticsView
+        - domainAdministrator
+        - domainSettingsUpdate
+        - domainSettingsView
+        - financeUpdate
+        - financeView
+        - marketingUpdate
+        - marketingView
+        - menuUpdate
+        - menuView
+        - pointSettingsUpdate
+        - pointSettingsView
+        - terminalUpdate
+        - terminalView
+        - userUpdate
+        - userView
+        - userRoleUpdate
+        - userRoleView
+        - warehouseUpdate
+        - warehouseView
+        - support
+        - technical
+        - owner
+    AuthItemTerminalEnum:
+      type: string
+      enum:
+        - OpenShift
+        - CloseShift
+        - OpenPersonalShift
+        - ViewStatsShifts
+        - ViewOtherPersonalShift
+        - ViewOtherReceipt
+        - RemoveDb
+        - ExitFromApp
+        - CreateOrder
+        - EditOrder
+        - RemoveOrder
+        - PaymentOrder
+        - ReturnOrder
+        - InteractionWithDevices
+        - CreateTransaction
+        - ViewTransaction
+        - CancelPrecheck
+        - KegWarningOperation
+        - CrudMenu
+        - CrudInvoice
+        - CrudWriteoff
+        - CrudInventory
+    CheckMarkcodeModeEnum:
+      type: string
+      enum:
+        - none
+        - basic
+        - strict
+    ConfigKeyEnum:
+      type: string
+      enum:
+        - support_phone
+        - receipt_image_base64
+        - logo
+        - partner_phone
+        - partner_name
+        - partner_email
+        - paid_to_date
+        - disable_period
+        - domain_id
+        - client_id
+        - log_url
+        - date_closing_financial_transactions
+        - currency_code
+        - currency_name
+        - currency_symbol
+        - currency_digits
+        - available_phone_countries
+    CookingMethodEnum:
+      type: string
+      enum:
+        - fried
+        - baked
+        - grilled
+        - not_cooked
+    CustomModelEvents:
+      type: string
+      enum:
+        - softDelete
+    FinanceTransferTypeEnum:
+      type: string
+      enum:
+        - in
+        - out
+        - transfer
+    FiscalizationEnum:
+      type: string
+      enum:
+        - 'on'
+        - 'off'
+        - by_terminal
+    FoodPortionEnum:
+      type: string
+      enum:
+        - portion_for_several_people
+        - big_portion
+        - combo
+    FoodSpecificationEnum:
+      type: string
+      enum:
+        - halal
+        - meat_free
+    FoodSpicinessEnum:
+      type: string
+      enum:
+        - spicy
+    KegActionTypesEnum:
+      type: string
+      enum:
+        - attach
+        - detach
+        - spill
+        - sale
+    KktTypeEnum:
+      type: string
+      enum:
+        - atol
+        - kassatka
+        - rr_electro
+        - mitsu
+    LegalEntityTypeEnum:
+      type: string
+      enum:
+        - ooo
+        - ip
+        - self_employed
+        - personal
+        - government
+        - division
+    MeasurementUnitId:
+      type: integer
+      enum:
+        - Milliliter
+        - Liter
+        - Milligram
+        - Gram
+        - Kilogram
+        - Package
+        - Thing
+        - Portion
+    MenuWriteOffEnum:
+      type: string
+      enum:
+        - warehouse
+        - produce
+        - produce_if_warehouse_empty
+    NomenclatureExciseEnum:
+      type: string
+      enum:
+        - sugar_drink
+        - other
+    NomenclatureSaleSpecificationEnum:
+      type: string
+      enum:
+        - simple
+        - light_alcohol
+        - strong_alcohol
+        - keg_non_alcohol
+        - keg_alcohol
+        - cigarette
+    NomenclatureTypeEnum:
+      type: string
+      enum:
+        - product
+        - recipe
+    NotificationLocationEnum:
+      type: string
+      enum:
+        - panel
+        - email
+        - telegram
+        - mobile_app
+    OrderDeliveryPaymentTypeEnum:
+      type: string
+      enum:
+        - CASH
+        - CARD
+    OrderSourceEnum:
+      type: string
+      enum:
+        - local
+        - kiosk
+        - yandex
+        - delivery_club
+        - other
+    OrderSourceTypeEnum:
+      type: string
+      enum:
+        - self
+        - delivery
+        - pickup
+        - marketplace
+    OrderStatus:
+      type: string
+      enum:
+        - created
+        - to_preparation
+        - preparation
+        - prepared
+        - to_production
+        - production
+        - produced
+        - to_packaging
+        - packaging
+        - packaged
+        - to_client
+        - given
+        - awaiting_payment
+        - closed
+    PaymentTypeType:
+      type: string
+      enum:
+        - cash
+        - cashless
+    PointPaymentSchemaEnum:
+      type: string
+      enum:
+        - standard
+        - intent
+        - credit
+    PointProduceSchemaEnum:
+      type: string
+      enum:
+        - manual_produce
+        - auto_with_expand
+    PrinterTypeEnum:
+      type: string
+      enum:
+        - kkt
+        - pos
+        - system
+        - zpl
+    RecipeChangeTypeEnum:
+      type: string
+      enum:
+        - add
+        - change
+    ScaleNameEnum:
+      type: string
+      enum:
+        - г
+        - мл
+        - g
+        - ml
+    ScaleProtocolEnum:
+      type: string
+      enum:
+        - pos2m
+        - casm
+        - massak
+    ScannerTypeEnum:
+      type: string
+      enum:
+        - com
+        - keyboard
+        - bluetooth
+        - camera
+    ShiftAmountTypeEnum:
+      type: string
+      enum:
+        - created
+        - closed
+    ShiftTransactionTypeEnum:
+      type: string
+      enum:
+        - replenishment
+        - expense
+        - cash-in-transit
+    ShiftTypeEnum:
+      type: string
+      enum:
+        - general
+        - personal
+    TableShapeEnum:
+      type: string
+      enum:
+        - rectangle
+        - ellipse
+    TaxationEnum:
+      type: string
+      enum:
+        - osn
+        - usn_income
+        - usn_income_outcome
+        - esn
+        - patent
+    TerminalAppEnum:
+      type: string
+      enum:
+        - terminal
+        - kitchen
+        - package
+        - queue
+        - kiosk
+    TerminalScreenOrientationEnum:
+      type: string
+      enum:
+        - '0'
+        - '1'
+        - '2'
+        - '4'
+        - '8'
+    TokenType:
+      type: string
+      enum:
+        - api
+        - boss
+        - spa
+        - terminal
+        - system
+    TspiotStatusEnum:
+      type: string
+      enum:
+        - error
+        - blocked
+        - success
+        - pending
+        - cancel
+    UserType:
+      type: string
+      enum:
+        - api
+        - general
+        - terminal
+        - system
+    VatEnum:
+      type: string
+      enum:
+        - 'no'
+        - vat0
+        - vat5
+        - vat105
+        - vat7
+        - vat107
+        - vat10
+        - vat110
+        - vat20
+        - vat120
+        - vat22
+        - vat122
+    FinanceAccountEntityEnum:
+      type: string
+      enum:
+        - point
+        - legal_entity
+        - payment_type
+    FinanceCategoryEnum:
+      type: integer
+      enum:
+        - INCOME
+        - EXPENSE
+    FinanceTransactionActionEnum:
+      type: string
+      enum:
+        - create
+        - update
+        - delete
+    FinanceTransactionEntityEnum:
+      type: string
+      enum:
+        - shift_transaction
+        - receipt_payment
+        - finance_moving
+        - finance_invoice_payment
+    MenuIconEnum:
+      type: string
+      enum:
+        - Bread.svg
+        - Chiken.svg
+        - Coctail-1.svg
+        - Coffee.svg
+        - Mushroom.svg
+        - Pepper.svg
+        - Water.svg
+        - Wine.svg
+        - agony.svg
+        - banan.svg
+        - beer.svg
+        - blin.svg
+        - burger.svg
+        - cake.svg
+        - canned.svg
+        - cheese.svg
+        - chocolate.svg
+        - citrus.svg
+        - coctail.svg
+        - cook.svg
+        - croissant.svg
+        - desert.svg
+        - egg.svg
+        - eggs.svg
+        - fish.svg
+        - fluids.svg
+        - free.svg
+        - friable.svg
+        - garnir.svg
+        - giros.svg
+        - honey.svg
+        - hotdog.svg
+        - icecream-1.svg
+        - icecream.svg
+        - instruments.svg
+        - jam.svg
+        - kandy.svg
+        - kebab.svg
+        - keks.svg
+        - meat-1.svg
+        - meat.svg
+        - milk.svg
+        - noodles.svg
+        - pasta.svg
+        - pie.svg
+        - pizza-2.svg
+        - pizza.svg
+        - salat.svg
+        - salt.svg
+        - sandvich.svg
+        - sandwich.svg
+        - sausage.svg
+        - sausages.svg
+        - soup-1.svg
+        - soup.svg
+        - strawberry.svg
+        - sushi-2.svg
+        - sushi.svg
+        - tea.svg
+        - wok-1.svg
+        - wok.svg
+        - zakuska.svg
+    ClientBonusTransactionReasonEnum:
+      type: string
+      enum:
+        - welcome
+        - birthday
+        - sell
+        - return
+        - manual
+        - expired
+        - referral
+    ClientBonusTransactionTypeEnum:
+      type: string
+      enum:
+        - in
+        - out
+    DiscountCalcTypeEnum:
+      type: string
+      enum:
+        - percent
+        - sum
+    DiscountEntityEnum:
+      type: string
+      enum:
+        - menu_category
+        - menu
+        - non_entity
+    DiscountEntityIOTypeEnum:
+      type: string
+      enum:
+        - include
+        - exclude
+    DiscountForEnum:
+      type: string
+      enum:
+        - receipt
+        - receipt_item
+    DiscountTypeEnum:
+      type: string
+      enum:
+        - client_bonus
+        - client_simple
+        - n_plus_one
+        - simple
+    ReceiptFiscalTypeEnum:
+      type: string
+      enum:
+        - sell
+        - buy
+        - sellReturn
+        - buyReturn
+        - sellCorrection
+        - buyCorrection
+        - sellReturnCorrection
+        - buyReturnCorrection
+    ReceiptItemDeletedReasonEnum:
+      type: string
+      enum:
+        - client_cancel
+        - staff_error
+        - not_found
+    ReceiptItemEgaisStatusEnum:
+      type: string
+      enum:
+        - pending
+        - success
+        - blocked
+        - error
+    ReceiptItemLmchzStatusEnum:
+      type: string
+      enum:
+        - error
+        - blocked
+        - success
+        - pending
+        - cancel
+    ReceiptItemOismStatusEnum:
+      type: string
+      enum:
+        - error
+        - blocked
+        - success
+        - decision
+        - pending
+        - cancel
+    ReceiptItemRrStatusEnum:
+      type: string
+      enum:
+        - error
+        - blocked
+        - success
+        - pending
+        - cancel
+    ReceiptItemStatusEnum:
+      type: string
+      enum:
+        - pending
+        - preparing
+        - ready
+    ReceiptManualCorrectionBaseTypeEnum:
+      type: string
+      enum:
+        - self
+        - instruction
+    ReceiptManualTypeEnum:
+      type: string
+      enum:
+        - sell
+        - buy
+        - sell_return
+        - buy_return
+        - sell_correction
+        - buy_correction
+    ReceiptStatusEnum:
+      type: string
+      enum:
+        - created
+        - to_preparation
+        - preparation
+        - prepared
+        - to_production
+        - production
+        - produced
+        - to_packaging
+        - packaging
+        - packaged
+        - to_client
+        - given
+        - awaiting_payment
+        - closed
+    ReceiptTypeEnum:
+      type: string
+      enum:
+        - advance
+        - return
+        - pre_payment
+        - full
+    TransactionActionEnum:
+      type: string
+      enum:
+        - create
+        - update
+        - delete
+    TransactionEntityEnum:
+      type: string
+      enum:
+        - warehouse_invoice_item
+        - warehouse_writeoff_item
+        - warehouse_moving_item
+        - warehouse_produce_item
+        - warehouse_produce_item_in
+        - warehouse_produce_item_out
+        - warehouse_inventory_item
+        - receipt_item
+        - receipt_payment
+        - shift
+        - shift_transaction
+    TransactionTypeEnum:
+      type: string
+      enum:
+        - in
+        - out
+        - inventory
+    DepartmentView:
+      required:
+        - name
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          description: 'Уникально среди не удалённых'
+          type: string
+          example: Кухня
+          maxLength: 255
+        created_by:
+          type: integer
+          readOnly: true
+          example: 1
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          example: '2026-01-01 00:00:00'
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          example: '2026-01-01 00:00:00'
+          nullable: true
+        deleted_at:
+          type: string
+          format: date-time
+          readOnly: true
+          example: '2026-01-01 00:00:00'
+          nullable: true
+      type: object
+    DepartmentUpdate:
+      required:
+        - name
+      properties:
+        name:
+          description: 'Уникально среди не удалённых'
+          type: string
+          example: Кухня
+          maxLength: 255
+      type: object
+    HallView:
+      required:
+        - point_id
+        - name
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        point_id:
+          type: integer
+          example: 1
+        name:
+          description: 'Уникально в рамках точки продаж среди не удалённых'
+          type: string
+          example: 'Основной зал'
+          maxLength: 255
+        created_by:
+          type: integer
+          readOnly: true
+          example: 1
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          example: '2026-01-01 00:00:00'
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          example: '2026-01-01 00:00:00'
+        deleted_at:
+          type: string
+          format: date-time
+          readOnly: true
+          example: '2026-01-01 00:00:00'
+          nullable: true
+      type: object
+    HallUpdate:
+      required:
+        - point_id
+        - name
+      properties:
+        point_id:
+          type: integer
+          example: 1
+        name:
+          description: 'Уникально в рамках точки продаж среди не удалённых'
+          type: string
+          example: 'Основной зал'
+          maxLength: 255
+      type: object
+    LegalEntityView:
+      required:
+        - type
+        - name
+        - inn
+        - taxation
+        - vat
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
+          example: a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11
+        parent_id:
+          type: integer
+          example: null
+          nullable: true
+        type:
+          $ref: '#/components/schemas/LegalEntityTypeEnum'
+        taxation:
+          $ref: '#/components/schemas/TaxationEnum'
+        vat:
+          $ref: '#/components/schemas/VatEnum'
+        name:
+          type: string
+          example: 'ООО «Кофейня»'
+          maxLength: 1024
+        reverse_name:
+          description: 'Обратное наименование'
+          type: string
+          example: 'Кофейня ООО'
+          nullable: true
+          maxLength: 1024
+        inn:
+          description: 'ИНН: 10 символов для ООО, 12 или 15 для остальных типов'
+          type: string
+          example: '7700000000'
+          maxLength: 255
+        kpp:
+          type: string
+          example: '770001001'
+          nullable: true
+          maxLength: 255
+        legal_address:
+          type: string
+          example: 'г. Москва, ул. Ленина, 1'
+          nullable: true
+          maxLength: 1024
+        post_address:
+          type: string
+          example: 'г. Москва, ул. Ленина, 1'
+          nullable: true
+          maxLength: 1024
+        created_by:
+          type: integer
+          readOnly: true
+          example: 1
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          example: '2026-01-01 00:00:00'
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          example: '2026-01-01 00:00:00'
+        deleted_at:
+          type: string
+          format: date-time
+          readOnly: true
+          example: '2026-01-01 00:00:00'
+          nullable: true
+      type: object
+    LegalEntityUpdate:
+      required:
+        - type
+        - name
+        - inn
+        - taxation
+        - vat
+      properties:
+        type:
+          $ref: '#/components/schemas/LegalEntityTypeEnum'
+        name:
+          type: string
+          example: 'ООО «Кофейня»'
+          maxLength: 1024
+        inn:
+          description: 'ИНН: 10 символов для ООО, 12 или 15 для остальных типов'
+          type: string
+          example: '7700000000'
+          maxLength: 255
+        kpp:
+          type: string
+          example: '770001001'
+          nullable: true
+          maxLength: 255
+        parent_id:
+          type: integer
+          example: null
+          nullable: true
+        reverse_name:
+          type: string
+          example: 'Кофейня ООО'
+          nullable: true
+          maxLength: 1024
+        legal_address:
+          type: string
+          example: 'г. Москва, ул. Ленина, 1'
+          nullable: true
+          maxLength: 1024
+        post_address:
+          type: string
+          example: 'г. Москва, ул. Ленина, 1'
+          nullable: true
+          maxLength: 1024
+        taxation:
+          $ref: '#/components/schemas/TaxationEnum'
+        vat:
+          $ref: '#/components/schemas/VatEnum'
+        bankAccounts:
+          description: 'Массив банковских счетов для создания/обновления'
+          type: array
+          items:
+            properties:
+              id:
+                description: 'ID счёта для обновления'
+                type: integer
+                nullable: true
+              account:
+                description: 'Номер счёта'
+                type: string
+                example: '40702810000000000001'
+              currency_id:
+                type: integer
+                example: 1
+              is_default:
+                type: boolean
+                example: true
+              bank_bic:
+                description: 'БИК банка'
+                type: string
+                example: '044525225'
+              bank:
+                properties:
+                  bic: { type: string, example: '044525225' }
+                  name: { type: string, example: 'ПАО Сбербанк' }
+                type: object
+            type: object
+          nullable: true
+      type: object
+    MenuCategoryView:
+      required:
+        - name
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        parent_id:
+          type: integer
+          example: null
+          nullable: true
+        name:
+          description: 'Уникально среди не удалённых'
+          type: string
+          example: Капучино
+          maxLength: 255
+        sort_position:
+          type: integer
+          example: 1
+          maximum: 65535
+          minimum: 0
+        image:
+          description: 'Имя файла изображения'
+          type: string
+          example: '69c641eddbcf7_2026-01-01_00:00:00.jpeg'
+          nullable: true
+          maxLength: 255
+        image_url:
+          description: 'Публичный URL изображения из S3'
+          type: string
+          format: uri
+          readOnly: true
+          example: 'https://api4files.fusionpos.ru/my-domain/menus/69c641eddbcf7_2026-01-01_00:00:00.jpeg'
+          nullable: true
+        icon:
+          oneOf:
+            -
+              $ref: '#/components/schemas/MenuIconEnum'
+          nullable: true
+          description: 'Код иконки (MenuIconEnum)'
+          type: string
+          example: Coffee.svg
+        icon_url:
+          description: 'Публичный URL SVG-иконки из S3'
+          type: string
+          format: uri
+          readOnly: true
+          example: 'https://s3.fusionpos.ru/web/images/svg/Coffee.svg'
+          nullable: true
+        icon_color:
+          type: string
+          example: '#FF5733'
+          nullable: true
+          maxLength: 255
+        created_by:
+          type: integer
+          readOnly: true
+          example: 1
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          example: '2026-01-00 00:00:00'
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          example: '2026-01-00 00:00:00'
+        deleted_at:
+          type: string
+          format: date-time
+          readOnly: true
+          example: '2026-01-00 00:00:00'
+          nullable: true
+      type: object
+    MenuCategoryUpdate:
+      required:
+        - name
+      properties:
+        parent_id:
+          type: integer
+          example: null
+          nullable: true
+        name:
+          description: 'Уникально среди не удалённых'
+          type: string
+          example: Капучино
+          maxLength: 255
+        sort_position:
+          type: integer
+          example: 1
+          maximum: 65535
+          minimum: 0
+        image:
+          description: 'Имя файла изображения'
+          type: string
+          example: '69c641eddbcf7_2026-01-01_00:00:00.jpeg'
+          nullable: true
+          maxLength: 255
+        icon:
+          oneOf:
+            -
+              $ref: '#/components/schemas/MenuIconEnum'
+          nullable: true
+          description: 'Код иконки (MenuIconEnum)'
+          type: string
+          example: Coffee.svg
+        icon_color:
+          type: string
+          example: '#FF5733'
+          nullable: true
+          maxLength: 255
+      type: object
+    MenuView:
+      required:
+        - category_id
+        - kkt_payment_object_id
+        - name
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
+          example: 550e8400-e29b-41d4-a716-446655440000
+        category_id:
+          type: integer
+          example: 1
+        nomenclature_id:
+          type: integer
+          example: null
+          nullable: true
+        kkt_payment_object_id:
+          type: integer
+          example: 1
+        vat:
+          oneOf:
+            -
+              $ref: '#/components/schemas/VatEnum'
+          nullable: true
+          description: 'Ставка НДС (VatEnum)'
+          type: string
+          example: 'no'
+        name:
+          description: 'Уникально среди не удалённых'
+          type: string
+          example: Капучино
+          maxLength: 255
+        available_external_orders:
+          description: 'Доступен для внешних заказов'
+          type: boolean
+          example: false
+        department_id:
+          type: integer
+          example: null
+          nullable: true
+        price:
+          description: 'Цена в копейках'
+          type: integer
+          example: 25000
+          minimum: 0
+        is_favorite:
+          type: boolean
+          example: false
+        favorite_by:
+          type: integer
+          readOnly: true
+          example: null
+          nullable: true
+        is_stopped:
+          type: boolean
+          example: false
+        stopped_by:
+          type: integer
+          readOnly: true
+          example: null
+          nullable: true
+        stopped_comment:
+          type: string
+          example: null
+          nullable: true
+          maxLength: 255
+        measurement_unit_id:
+          type: integer
+          example: null
+          nullable: true
+        weight_quantum:
+          description: 'Шаг веса для весового товара'
+          type: number
+          format: float
+          example: null
+          nullable: true
+          maximum: 100
+          minimum: 0.001
+        is_bulk:
+          description: 'Весовой товар'
+          type: boolean
+          example: false
+        is_active:
+          type: boolean
+          example: true
+        is_free_price:
+          description: 'Свободная цена'
+          type: boolean
+          example: false
+        sort_position:
+          type: integer
+          example: 1
+        image:
+          description: 'Имя файла изображения'
+          type: string
+          example: '69c641eddbcf7_2026-01-01_00:00:00.jpeg'
+          nullable: true
+          maxLength: 255
+        image_url:
+          description: 'Публичный URL изображения из S3'
+          type: string
+          format: uri
+          readOnly: true
+          example: 'https://api4files.fusionpos.ru/my-domain/menus/69c641eddbcf7_2026-01-01_00:00:00.jpeg'
+          nullable: true
+        icon:
+          oneOf:
+            -
+              $ref: '#/components/schemas/MenuIconEnum'
+          nullable: true
+          description: 'Код иконки (MenuIconEnum)'
+          type: string
+          example: Coffee.svg
+        icon_url:
+          description: 'Публичный URL SVG-иконки из S3'
+          type: string
+          format: uri
+          readOnly: true
+          example: 'https://s3.fusionpos.ru/web/images/svg/Coffee.svg'
+          nullable: true
+        icon_color:
+          type: string
+          example: '#FF5733'
+          nullable: true
+          maxLength: 255
+        max_discount_percent:
+          type: number
+          format: float
+          example: 100
+          maximum: 100
+          minimum: 0
+        max_expense_bonus_percent:
+          type: number
+          format: float
+          example: 100
+          maximum: 100
+          minimum: 0
+        max_replenishment_bonus_percent:
+          type: number
+          format: float
+          example: 0
+          maximum: 100
+          minimum: 0
+        created_by:
+          type: integer
+          readOnly: true
+          example: 1
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          example: '2026-01-00 00:00:00'
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          example: '2026-01-00 00:00:00'
+        deleted_at:
+          type: string
+          format: date-time
+          readOnly: true
+          example: '2026-01-00 00:00:00'
+          nullable: true
+      type: object
+    MenuUpdate:
+      required:
+        - category_id
+        - kkt_payment_object_id
+        - name
+      properties:
+        category_id:
+          type: integer
+          example: 1
+        nomenclature_id:
+          type: integer
+          example: null
+          nullable: true
+        kkt_payment_object_id:
+          type: integer
+          example: 1
+        vat:
+          oneOf:
+            -
+              $ref: '#/components/schemas/VatEnum'
+          nullable: true
+          description: 'Ставка НДС (VatEnum)'
+          type: string
+          example: 'no'
+        write_off_schema:
+          $ref: '#/components/schemas/MenuWriteOffEnum'
+        name:
+          description: 'Уникально среди не удалённых'
+          type: string
+          example: Капучино
+          maxLength: 255
+        available_external_orders:
+          description: 'Доступен для внешних заказов'
+          type: boolean
+          example: false
+        department_id:
+          type: integer
+          example: null
+          nullable: true
+        price:
+          description: 'Цена в копейках'
+          type: integer
+          example: 25000
+          minimum: 0
+        is_favorite:
+          type: boolean
+          example: false
+        is_stopped:
+          type: boolean
+          example: false
+        stopped_comment:
+          type: string
+          example: null
+          nullable: true
+          maxLength: 255
+        measurement_unit_id:
+          type: integer
+          example: null
+          nullable: true
+        weight_quantum:
+          description: 'Шаг веса для весового товара'
+          type: number
+          format: float
+          example: null
+          nullable: true
+          maximum: 100
+          minimum: 0.001
+        is_bulk:
+          description: 'Весовой товар'
+          type: boolean
+          example: false
+        is_active:
+          type: boolean
+          example: true
+        is_free_price:
+          description: 'Свободная цена'
+          type: boolean
+          example: false
+        sort_position:
+          type: integer
+          example: 1
+        image:
+          description: 'Имя файла изображения'
+          type: string
+          example: '69c641eddbcf7_2026-01-01_00:00:00.jpeg'
+          nullable: true
+          maxLength: 255
+        icon:
+          oneOf:
+            -
+              $ref: '#/components/schemas/MenuIconEnum'
+          nullable: true
+          description: 'Код иконки (MenuIconEnum)'
+          type: string
+          example: Coffee.svg
+        icon_color:
+          type: string
+          example: '#FF5733'
+          nullable: true
+          maxLength: 255
+        max_discount_percent:
+          type: number
+          format: float
+          example: 100
+          maximum: 100
+          minimum: 0
+        max_expense_bonus_percent:
+          type: number
+          format: float
+          example: 100
+          maximum: 100
+          minimum: 0
+        max_replenishment_bonus_percent:
+          type: number
+          format: float
+          example: 100
+          maximum: 100
+          minimum: 0
+      type: object
+    NomenclatureCategoryView:
+      required:
+        - name
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
+          example: 550e8400-e29b-41d4-a716-446655440000
+        parent_id:
+          type: integer
+          example: null
+          nullable: true
+        name:
+          description: 'Уникально среди не удалённых'
+          type: string
+          example: 'Молочные продукты'
+          maxLength: 255
+        created_by:
+          type: integer
+          readOnly: true
+          example: 1
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          example: '2026-01-00 00:00:00'
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          example: '2026-01-00 00:00:00'
+        deleted_at:
+          type: string
+          format: date-time
+          readOnly: true
+          example: '2026-01-00 00:00:00'
+          nullable: true
+      type: object
+    NomenclatureCategoryUpdate:
+      required:
+        - name
+      properties:
+        parent_id:
+          type: integer
+          example: null
+          nullable: true
+        name:
+          description: 'Уникально среди не удалённых'
+          type: string
+          example: 'Молочные продукты'
+          maxLength: 255
+      type: object
+    NomenclatureView:
+      required:
+        - category_id
+        - type
+        - name
+        - sale_specification
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
+          example: 550e8400-e29b-41d4-a716-446655440000
+        category_id:
+          type: integer
+          example: 1
+        type:
+          $ref: '#/components/schemas/NomenclatureTypeEnum'
+        name:
+          description: 'Уникально среди не удалённых'
+          type: string
+          example: 'Молоко 3.2%'
+          maxLength: 255
+          minLength: 1
+        measurement_unit_id:
+          type: integer
+          example: 1
+          nullable: true
+        base_price:
+          description: 'Базовая цена в копейках'
+          type: integer
+          example: 15000
+          minimum: 0
+        scale_name:
+          oneOf:
+            -
+              $ref: '#/components/schemas/ScaleNameEnum'
+          nullable: true
+          description: Размерность
+          type: string
+          example: г
+        scale_value:
+          description: Вес/объём
+          type: number
+          format: float
+          example: null
+          nullable: true
+          minimum: 0
+        sale_specification:
+          $ref: '#/components/schemas/NomenclatureSaleSpecificationEnum'
+        default_quantity_writeoff:
+          description: 'Количество списания по умолчанию'
+          type: number
+          format: float
+          example: 1
+          minimum: 0
+        default_quantity_gross:
+          description: 'Количество брутто по умолчанию'
+          type: number
+          format: float
+          example: 1
+          minimum: 0
+        default_quantity_net:
+          description: 'Количество нетто по умолчанию'
+          type: number
+          format: float
+          example: 1
+          minimum: 0
+        default_quantity:
+          description: 'Количество по умолчанию'
+          type: number
+          format: float
+          example: 1
+          minimum: 0
+        description:
+          type: string
+          example: null
+          nullable: true
+          maxLength: 2048
+        allergens:
+          type: string
+          example: null
+          nullable: true
+          maxLength: 1024
+        protein:
+          description: 'Белки (г)'
+          type: number
+          format: float
+          example: null
+          nullable: true
+          minimum: 0
+        fat:
+          description: 'Жиры (г)'
+          type: number
+          format: float
+          example: null
+          nullable: true
+          minimum: 0
+        carbohydrate:
+          description: 'Углеводы (г)'
+          type: number
+          format: float
+          example: null
+          nullable: true
+          minimum: 0
+        kilocalories:
+          description: 'Калорийность (ккал)'
+          type: number
+          format: float
+          example: null
+          nullable: true
+          minimum: 0
+        food_specification:
+          oneOf:
+            -
+              $ref: '#/components/schemas/FoodSpecificationEnum'
+          nullable: true
+          description: 'Особенности питания (FoodSpecificationEnum)'
+          type: string
+          example: null
+        food_spiciness:
+          oneOf:
+            -
+              $ref: '#/components/schemas/FoodSpicinessEnum'
+          nullable: true
+          description: 'Острота (FoodSpicinessEnum)'
+          type: string
+          example: null
+        cooking_method:
+          oneOf:
+            -
+              $ref: '#/components/schemas/CookingMethodEnum'
+          nullable: true
+          description: 'Способ готовки (CookingMethodEnum)'
+          type: string
+          example: null
+        food_portion:
+          oneOf:
+            -
+              $ref: '#/components/schemas/FoodPortionEnum'
+          nullable: true
+          description: 'Размер (FoodPortionEnum)'
+          type: string
+          example: null
+        excise:
+          $ref: '#/components/schemas/NomenclatureExciseEnum'
+        default_cold_percent:
+          description: 'Потери при холодной обработке, % по умолчанию'
+          type: number
+          format: float
+          example: 0
+          nullable: true
+          maximum: 100
+          minimum: -999
+        default_hot_percent:
+          description: 'Потери при горячей обработки, % по умолчанию'
+          type: number
+          format: float
+          example: 0
+          nullable: true
+          maximum: 100
+          minimum: -999
+        default_process_description:
+          description: 'Описание производства по умолчанию'
+          type: string
+          example: null
+          nullable: true
+          maxLength: 4096
+        default_prepare_description:
+          description: 'Описание обработки по умолчанию'
+          type: string
+          example: null
+          nullable: true
+          maxLength: 255
+        created_by:
+          type: integer
+          readOnly: true
+          example: 1
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          example: '2026-01-00 00:00:00'
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          example: '2026-01-00 00:00:00'
+        deleted_at:
+          type: string
+          format: date-time
+          readOnly: true
+          example: '2026-01-00 00:00:00'
+          nullable: true
+      type: object
+    NomenclatureUpdate:
+      required:
+        - category_id
+        - type
+        - name
+        - sale_specification
+      properties:
+        category_id:
+          type: integer
+          example: 1
+        type:
+          $ref: '#/components/schemas/NomenclatureTypeEnum'
+        name:
+          description: 'Уникально среди не удалённых'
+          type: string
+          example: 'Молоко 3.2%'
+          maxLength: 255
+          minLength: 1
+        measurement_unit_id:
+          description: 'Обязательно для типов product и recipe'
+          type: integer
+          example: 1
+          nullable: true
+        base_price:
+          description: 'Базовая цена в копейках'
+          type: integer
+          example: 15000
+          minimum: 0
+        sale_specification:
+          $ref: '#/components/schemas/NomenclatureSaleSpecificationEnum'
+        scale_name:
+          oneOf:
+            -
+              $ref: '#/components/schemas/ScaleNameEnum'
+          nullable: true
+          description: 'Единица весов (ScaleNameEnum)'
+          type: string
+          example: null
+        scale_value:
+          description: 'Порог весов'
+          type: number
+          format: float
+          example: null
+          nullable: true
+          minimum: 0
+        default_quantity_writeoff:
+          type: number
+          format: float
+          example: 1
+          maximum: 10000000
+          minimum: 0
+        default_quantity_gross:
+          type: number
+          format: float
+          example: 1
+          maximum: 10000000
+          minimum: 0
+        default_quantity_net:
+          type: number
+          format: float
+          example: 1
+          maximum: 10000000
+          minimum: 0
+        default_quantity:
+          type: number
+          format: float
+          example: 1
+          maximum: 10000000
+          minimum: 0
+        default_cold_percent:
+          type: number
+          format: float
+          example: 0
+          nullable: true
+          maximum: 100
+          minimum: -999
+        default_hot_percent:
+          type: number
+          format: float
+          example: 0
+          nullable: true
+          maximum: 100
+          minimum: -999
+        default_prepare_description:
+          type: string
+          example: null
+          nullable: true
+          maxLength: 255
+        default_process_description:
+          type: string
+          example: null
+          nullable: true
+          maxLength: 4096
+        description:
+          type: string
+          example: null
+          nullable: true
+          maxLength: 2048
+        compound:
+          type: string
+          example: null
+          nullable: true
+          maxLength: 1024
+        allergens:
+          type: string
+          example: null
+          nullable: true
+          maxLength: 1024
+        protein:
+          type: number
+          format: float
+          example: null
+          nullable: true
+          minimum: 0
+        fat:
+          type: number
+          format: float
+          example: null
+          nullable: true
+          minimum: 0
+        carbohydrate:
+          type: number
+          format: float
+          example: null
+          nullable: true
+          minimum: 0
+        kilocalories:
+          type: number
+          format: float
+          example: null
+          nullable: true
+          minimum: 0
+        food_specification:
+          oneOf:
+            -
+              $ref: '#/components/schemas/FoodSpecificationEnum'
+          nullable: true
+          description: 'Пищевая спецификация (FoodSpecificationEnum)'
+          type: string
+          example: null
+        food_spiciness:
+          oneOf:
+            -
+              $ref: '#/components/schemas/FoodSpicinessEnum'
+          nullable: true
+          description: 'Острота (FoodSpicinessEnum)'
+          type: string
+          example: null
+        cooking_method:
+          oneOf:
+            -
+              $ref: '#/components/schemas/CookingMethodEnum'
+          nullable: true
+          description: 'Метод приготовления (CookingMethodEnum)'
+          type: string
+          example: null
+        food_portion:
+          oneOf:
+            -
+              $ref: '#/components/schemas/FoodPortionEnum'
+          nullable: true
+          description: 'Порция (FoodPortionEnum)'
+          type: string
+          example: null
+        excise:
+          $ref: '#/components/schemas/NomenclatureExciseEnum'
+      type: object
+    PointView:
+      required:
+        - name
+        - legal_entity_uuid
+        - is_send_to_work
+        - is_skip_markcode
+        - markcode_online_is_test
+        - markcode_online_timeout
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
+          example: a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11
+        warehouse_id:
+          type: integer
+          example: 1
+          nullable: true
+        legal_entity_uuid:
+          type: string
+          format: uuid
+          example: a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11
+        taxation:
+          oneOf:
+            -
+              $ref: '#/components/schemas/TaxationEnum'
+          nullable: true
+          description: 'Система налогообложения (TaxationEnum)'
+          type: string
+          example: osn
+        vat:
+          oneOf:
+            -
+              $ref: '#/components/schemas/VatEnum'
+          nullable: true
+          description: 'Ставка НДС (VatEnum)'
+          type: string
+          example: vat20
+        name:
+          description: 'Уникально среди не удалённых'
+          type: string
+          example: 'Кофейня на Ленина'
+          maxLength: 255
+        address:
+          type: string
+          example: 'ул. Ленина, 1'
+          nullable: true
+          maxLength: 255
+        timezone:
+          type: string
+          example: Europe/Moscow
+          nullable: true
+          maxLength: 255
+        payment_schema:
+          $ref: '#/components/schemas/PointPaymentSchemaEnum'
+        is_active:
+          type: boolean
+          readOnly: true
+          example: true
+        produce_schema:
+          $ref: '#/components/schemas/PointProduceSchemaEnum'
+        is_module_multiple_terminal:
+          type: boolean
+          readOnly: true
+          example: false
+        is_module_screens:
+          type: boolean
+          readOnly: true
+          example: false
+        is_module_finance:
+          type: boolean
+          readOnly: true
+          example: false
+        is_module_integrations:
+          type: boolean
+          readOnly: true
+          example: false
+        is_module_tables:
+          type: boolean
+          readOnly: true
+          example: false
+        is_module_waiter:
+          type: boolean
+          readOnly: true
+          example: false
+        is_send_to_work:
+          type: boolean
+          example: true
+        is_skip_markcode:
+          type: boolean
+          example: false
+        is_print_order_number_on_fiscal:
+          type: boolean
+          example: false
+        markcode_online_is_test:
+          type: boolean
+          example: false
+        markcode_online_timeout:
+          type: integer
+          example: 5000
+          minimum: 0
+        check_markcode_mode:
+          $ref: '#/components/schemas/CheckMarkcodeModeEnum'
+        receipt_image_base64:
+          description: 'Base64-изображение для чека'
+          type: string
+          nullable: true
+        income_finance_category_id:
+          type: integer
+          readOnly: true
+          example: 1
+          nullable: true
+        expenses_finance_category_id:
+          type: integer
+          readOnly: true
+          example: 2
+          nullable: true
+        created_by:
+          type: integer
+          readOnly: true
+          example: 1
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          example: '2026-01-01 00:00:00'
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          example: '2026-01-01 00:00:00'
+          nullable: true
+        deleted_at:
+          type: string
+          format: date-time
+          readOnly: true
+          example: '2026-01-01 00:00:00'
+          nullable: true
+      type: object
+    PointUpdate:
+      required:
+        - name
+        - legal_entity_uuid
+        - is_send_to_work
+        - is_skip_markcode
+        - markcode_online_is_test
+        - markcode_online_timeout
+      properties:
+        warehouse_id:
+          description: 'Обязателен при обновлении (не при создании)'
+          type: integer
+          example: 1
+          nullable: true
+        legal_entity_uuid:
+          type: string
+          format: uuid
+          example: a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11
+        taxation:
+          oneOf:
+            -
+              $ref: '#/components/schemas/TaxationEnum'
+          nullable: true
+          type: string
+          example: osn
+        vat:
+          oneOf:
+            -
+              $ref: '#/components/schemas/VatEnum'
+          nullable: true
+          type: string
+          example: vat20
+        name:
+          type: string
+          example: 'Кофейня на Ленина'
+          maxLength: 255
+        address:
+          type: string
+          example: 'ул. Ленина, 1'
+          nullable: true
+          maxLength: 255
+        timezone:
+          type: string
+          example: Europe/Moscow
+          nullable: true
+          maxLength: 255
+        payment_schema:
+          $ref: '#/components/schemas/PointPaymentSchemaEnum'
+        is_send_to_work:
+          type: boolean
+          example: true
+        is_skip_markcode:
+          type: boolean
+          example: false
+        is_print_order_number_on_fiscal:
+          type: boolean
+          example: false
+        markcode_online_is_test:
+          type: boolean
+          example: false
+        markcode_online_timeout:
+          type: integer
+          example: 5000
+          minimum: 0
+        check_markcode_mode:
+          $ref: '#/components/schemas/CheckMarkcodeModeEnum'
+        receipt_image_base64:
+          description: 'Base64-изображение для чека'
+          type: string
+          nullable: true
+        orderStatusPoints:
+          description: 'Массив статусов заказа для точки'
+          type: array
+          items:
+            properties:
+              order_status_id:
+                type: integer
+                example: 1
+              is_active:
+                type: boolean
+                example: true
+            type: object
+          nullable: true
+      type: object
+    SupplierView:
+      required:
+        - type
+        - name
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
+          example: a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11
+        name:
+          type: string
+          example: 'ООО «Продукт»'
+          maxLength: 1024
+        balance:
+          description: 'Баланс в копейках'
+          type: integer
+          example: 0
+        phone:
+          type: string
+          example: '+79001234567'
+          nullable: true
+          maxLength: 255
+        inn:
+          description: 'ИНН: 10 символов для ООО, 12 или 15 для остальных типов'
+          type: string
+          example: '7700000000'
+          nullable: true
+          maxLength: 255
+        kpp:
+          type: string
+          example: '770001001'
+          nullable: true
+          maxLength: 255
+        parent_id:
+          type: integer
+          example: null
+          nullable: true
+        type:
+          $ref: '#/components/schemas/LegalEntityTypeEnum'
+        reverse_name:
+          type: string
+          example: 'Продукт ООО'
+          nullable: true
+          maxLength: 1024
+        email:
+          type: string
+          format: email
+          example: supplier@example.com
+          nullable: true
+          maxLength: 255
+        firstname:
+          type: string
+          example: Иван
+          nullable: true
+          maxLength: 255
+        lastname:
+          type: string
+          example: Иванов
+          nullable: true
+          maxLength: 255
+        patronymic:
+          type: string
+          example: Иванович
+          nullable: true
+          maxLength: 255
+        legal_address:
+          type: string
+          example: 'г. Москва, ул. Ленина, 1'
+          nullable: true
+          maxLength: 1024
+        post_address:
+          type: string
+          example: 'г. Москва, ул. Ленина, 1'
+          nullable: true
+          maxLength: 1024
+        created_by:
+          type: integer
+          readOnly: true
+          example: 1
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          example: '2026-01-01 00:00:00'
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          example: '2026-01-01 00:00:00'
+        deleted_at:
+          type: string
+          format: date-time
+          readOnly: true
+          example: '2026-01-01 00:00:00'
+          nullable: true
+      type: object
+    SupplierUpdate:
+      required:
+        - type
+        - name
+      properties:
+        type:
+          $ref: '#/components/schemas/LegalEntityTypeEnum'
+        name:
+          type: string
+          example: 'ООО «Продукт»'
+          maxLength: 1024
+        inn:
+          description: 'ИНН: 10 символов для ООО, 12 или 15 для остальных типов'
+          type: string
+          example: '7700000000'
+          nullable: true
+          maxLength: 255
+        kpp:
+          type: string
+          example: '770001001'
+          nullable: true
+          maxLength: 255
+        parent_id:
+          type: integer
+          example: null
+          nullable: true
+        phone:
+          type: string
+          example: '+79001234567'
+          nullable: true
+          maxLength: 255
+        reverse_name:
+          type: string
+          example: 'Продукт ООО'
+          nullable: true
+          maxLength: 1024
+        email:
+          type: string
+          format: email
+          example: supplier@example.com
+          nullable: true
+          maxLength: 255
+        firstname:
+          type: string
+          example: Иван
+          nullable: true
+          maxLength: 255
+        lastname:
+          type: string
+          example: Иванов
+          nullable: true
+          maxLength: 255
+        patronymic:
+          type: string
+          example: Иванович
+          nullable: true
+          maxLength: 255
+        legal_address:
+          type: string
+          example: 'г. Москва, ул. Ленина, 1'
+          nullable: true
+          maxLength: 1024
+        post_address:
+          type: string
+          example: 'г. Москва, ул. Ленина, 1'
+          nullable: true
+          maxLength: 1024
+        bankAccounts:
+          description: 'Массив банковских счетов для создания/обновления'
+          type: array
+          items:
+            properties:
+              id:
+                description: 'ID счёта для обновления'
+                type: integer
+                nullable: true
+              account:
+                description: 'Номер счёта'
+                type: string
+                example: '40702810000000000001'
+              currency_id:
+                type: integer
+                example: 1
+              is_default:
+                type: boolean
+                example: true
+              bank_bic:
+                description: 'БИК банка'
+                type: string
+                example: '044525225'
+              bank:
+                properties:
+                  bic: { type: string, example: '044525225' }
+                  name: { type: string, example: 'ПАО Сбербанк' }
+                type: object
+            type: object
+          nullable: true
+      type: object
+    TableView:
+      required:
+        - hall_id
+        - name
+        - shape
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        hall_id:
+          type: integer
+          example: 1
+        name:
+          description: 'Уникально в рамках зала среди не удалённых'
+          type: string
+          example: 'Стол 1'
+          maxLength: 255
+        x:
+          description: 'Позиция по оси X'
+          type: number
+          format: float
+          example: 100.5
+          maximum: 10000
+          minimum: 0
+        'y':
+          description: 'Позиция по оси Y'
+          type: number
+          format: float
+          example: 200
+          maximum: 10000
+          minimum: 0
+        shape:
+          $ref: '#/components/schemas/TableShapeEnum'
+        width:
+          description: 'Ширина стола'
+          type: number
+          format: float
+          example: 120
+          maximum: 10000
+          minimum: 10
+        height:
+          description: 'Высота стола'
+          type: number
+          format: float
+          example: 80
+          maximum: 10000
+          minimum: 10
+        max_guests:
+          description: 'Максимальное количество гостей'
+          type: integer
+          example: 4
+          nullable: true
+          maximum: 10000
+          minimum: 0
+        created_by:
+          type: integer
+          readOnly: true
+          example: 1
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          example: '2026-01-01 00:00:00'
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          example: '2026-01-01 00:00:00'
+        deleted_at:
+          type: string
+          format: date-time
+          readOnly: true
+          example: '2026-01-01 00:00:00'
+          nullable: true
+      type: object
+    TableUpdate:
+      required:
+        - hall_id
+        - name
+        - shape
+      properties:
+        hall_id:
+          type: integer
+          example: 1
+        name:
+          description: 'Уникально в рамках зала среди не удалённых'
+          type: string
+          example: 'Стол 1'
+          maxLength: 255
+        x:
+          description: 'Позиция по оси X'
+          type: number
+          format: float
+          example: 100.5
+          maximum: 10000
+          minimum: 0
+        'y':
+          description: 'Позиция по оси Y'
+          type: number
+          format: float
+          example: 200
+          maximum: 10000
+          minimum: 0
+        shape:
+          $ref: '#/components/schemas/TableShapeEnum'
+        width:
+          description: 'Ширина стола'
+          type: number
+          format: float
+          example: 120
+          maximum: 10000
+          minimum: 10
+        height:
+          description: 'Высота стола'
+          type: number
+          format: float
+          example: 80
+          maximum: 10000
+          minimum: 10
+        max_guests:
+          description: 'Максимальное количество гостей'
+          type: integer
+          example: 4
+          nullable: true
+          maximum: 10000
+          minimum: 0
+      type: object
+  securitySchemes:
+    bearerAuth:
+      type: http
+      description: 'Вставьте ваш API токен, авторизация проиходит через header Authorization: Bearer <ТОКЕН>'
+      bearerFormat: JWT
+      scheme: bearer
+tags:
+  -
+    name: Department
+    description: Отделы
+  -
+    name: Hall
+    description: Залы
+  -
+    name: LegalEntity
+    description: 'Юридические лица'
+  -
+    name: MenuCategory
+    description: 'Категории меню'
+  -
+    name: Menu
+    description: 'Позиции меню'
+  -
+    name: NomenclatureCategory
+    description: 'Категории номенклатуры'
+  -
+    name: Nomenclature
+    description: Номенклатура
+  -
+    name: Point
+    description: 'Точки продаж'
+  -
+    name: Supplier
+    description: Поставщики
+  -
+    name: Table
+    description: Столы
