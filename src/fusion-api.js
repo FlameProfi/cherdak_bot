@@ -5,9 +5,9 @@ class FusionAPI {
   constructor() {
     this.baseURL = process.env.FUSION_BASE_URL;
     this.apiKey = process.env.FUSION_API_KEY;
-    this.apiVersion = process.env.FUSION_API_VERSION || 'v4'; // 'v2' or 'v4'
+    // Принудительно выставляем v2, раз в v4 нет работы с клиентами
+    this.apiVersion = 'v2'; 
 
-    // Default base URLs if not provided
     if (!this.baseURL) {
       const domain = process.env.FUSION_DOMAIN;
       this.baseURL = `https://${domain}.fusionpos.ru`;
@@ -29,32 +29,21 @@ class FusionAPI {
   async findClientByPhone(phone) {
     const cleanPhone = phone.replace(/\D/g, '');
     try {
-      if (this.apiVersion === 'v4') {
-        const response = await this.client.get('/api/v1/marketing/clients', {
+      // Пробуем сначала точечный поиск по телефону
+      try {
+        const response = await this.client.get('/api/v1/client/by-phone', {
+          params: { phone: cleanPhone }
+        });
+        if (response.data?.success && response.data?.data) {
+          return response.data.data;
+        }
+      } catch (e) {
+        // Если v1/client/by-phone недоступен, делаем поиск через v2/clients
+        const response = await this.client.get('/api/v2/clients', {
           params: { search: cleanPhone }
         });
-        const clients = response.data?.data;
-        if (Array.isArray(clients)) {
-          return clients.find(c => (c.phone || '').replace(/\D/g, '') === cleanPhone) || null;
-        }
-      } else {
-        // v2 (v3 doc refers to /api/v1/client/by-phone or /api/v2/clients)
-        // Trying by-phone first as it is more specific
-        try {
-          const response = await this.client.get('/api/v1/client/by-phone', {
-            params: { phone: cleanPhone }
-          });
-          if (response.data?.success && response.data?.data) {
-            return response.data.data;
-          }
-        } catch (e) {
-          // Fallback to general search if by-phone is not available
-          const response = await this.client.get('/api/v2/clients', {
-            params: { search: cleanPhone }
-          });
-          const clients = Array.isArray(response.data) ? response.data : (response.data?.data?.items || []);
-          return clients.find(c => (c.phone || '').replace(/\D/g, '') === cleanPhone) || null;
-        }
+        const clients = Array.isArray(response.data) ? response.data : (response.data?.data?.items || []);
+        return clients.find(c => (c.phone || '').replace(/\D/g, '') === cleanPhone) || null;
       }
       return null;
     } catch (error) {
@@ -67,37 +56,30 @@ class FusionAPI {
    * Создание нового клиента
    */
   async createClient(data) {
+    const idNetwork = data.id_network !== undefined ? data.id_network : (Number(process.env.FUSION_NETWORK_ID) || 1);
+
     try {
-      if (this.apiVersion === 'v4') {
-        const response = await this.client.post('/api/v1/marketing/clients', {
-          first_name: data.first_name || data.name,
-          last_name: data.last_name || data.lastname || '',
+      try {
+        // Пробуем через v1/client
+        const response = await this.client.post('/api/v1/client', {
+          id_network: idNetwork,
+          name: data.first_name || data.name,
+          lastname: data.last_name || data.lastname || '',
           phone: data.phone,
-          gender: data.gender || 'male'
+          id_group: data.id_group || process.env.FUSION_DEFAULT_GROUP_ID || 1
         });
         return response.data?.data || response.data;
-      } else {
-        // v2 (v3 doc refers to /api/v1/client)
-        // Note: id_group is often required in v2.
-        try {
-          const response = await this.client.post('/api/v1/client', {
-            name: data.first_name || data.name,
-            lastname: data.last_name || data.lastname || '',
-            phone: data.phone,
-            id_group: data.id_group || process.env.FUSION_DEFAULT_GROUP_ID || 1
-          });
-          return response.data?.data || response.data;
-        } catch (e) {
-          // Fallback to /api/v2/clients
-          const response = await this.client.post('/api/v2/clients', {
-            name: data.first_name || data.name,
-            lastname: data.last_name || data.lastname || '',
-            phone: data.phone,
-            gender: data.gender || 'male',
-            id_group: data.id_group || process.env.FUSION_DEFAULT_GROUP_ID || 1
-          });
-          return response.data;
-        }
+      } catch (e) {
+        // Если v1 упал, бьем в v2/clients (куда прилетал лог ошибки 422)
+        const response = await this.client.post('/api/v2/clients', {
+          id_network: idNetwork, // Передаем обязательный ID сети для прохождения валидации
+          name: data.first_name || data.name,
+          lastname: data.last_name || data.lastname || '',
+          phone: data.phone,
+          gender: data.gender || 'male',
+          id_group: data.id_group || process.env.FUSION_DEFAULT_GROUP_ID || 1
+        });
+        return response.data;
       }
     } catch (error) {
       console.error(`FusionAPI (${this.apiVersion}) createClient Error:`, error.response?.data || error.message);
@@ -108,24 +90,40 @@ class FusionAPI {
   /**
    * Получение деталей клиента
    */
+  /**
+   * Получение деталей клиента по ID
+   */
   async getClientDetails(clientId) {
+    // На всякий случай проверяем, что ID передан и это число
+    const id = Number(clientId);
+    if (!id || isNaN(id)) {
+      console.error(`FusionAPI getClientDetails Error: Невалидный clientId: ${clientId}`);
+      return null;
+    }
+
+    // Попытка №1: Пробуем старый эндпоинт v1
     try {
-      if (this.apiVersion === 'v4') {
-        const response = await this.client.get(`/api/v1/marketing/clients/${clientId}`);
+      console.log(`[FusionAPI] Попытка получить клиента через v1 (ID: ${id})...`);
+      const response = await this.client.get(`/api/v1/client/${id}`);
+      
+      // Если данные пришли, возвращаем их
+      if (response.data) {
         return response.data?.data || response.data;
-      } else {
-        // v2 (v3 doc refers to /api/v1/client/{id})
-        try {
-          const response = await this.client.get(`/api/v1/client/${clientId}`);
-          return response.data?.data || response.data;
-        } catch (e) {
-          // Fallback to /api/v2/clients/{id}
-          const response = await this.client.get(`/api/v2/clients/${clientId}`);
-          return response.data;
-        }
       }
-    } catch (error) {
-      console.error(`FusionAPI (${this.apiVersion}) getClientDetails Error:`, error.response?.data || error.message);
+    } catch (v1Error) {
+      console.warn(`[FusionAPI] Сбой запроса к v1: ${v1Error.response?.status || v1Error.message}. Пробуем эндпоинт v2...`);
+    }
+
+    // Попытка №2: Если v1 упал, пробуем эндпоинт v2
+    try {
+      const response = await this.client.get(`/api/v2/clients/${id}`);
+      return response.data?.data || response.data;
+    } catch (v2Error) {
+      // Если упали оба эндпоинта, выводим подробный лог финальной ошибки
+      console.error(
+        `[FusionAPI] Финальная ошибка getClientDetails для ID ${id}:`, 
+        v2Error.response?.data || v2Error.message
+      );
       return null;
     }
   }
@@ -136,16 +134,8 @@ class FusionAPI {
   normalizeClient(client) {
     if (!client) return null;
 
-    // Total spent extraction
-    let totalSpent = 0;
-    if (this.apiVersion === 'v4') {
-      totalSpent = client.total_buy_sum || 0;
-    } else {
-      // In v2/v3, it might be in total_buy_sum or sum_orders
-      totalSpent = client.total_buy_sum || client.sum_orders || 0;
-    }
-
-    // Discount extraction
+    const totalSpent = client.total_buy_sum || client.sum_orders || 0;
+    
     let discount = 0;
     if (client.discount !== undefined) {
       discount = client.discount;
@@ -155,9 +145,7 @@ class FusionAPI {
 
     return {
       id: client.id,
-      full_name: this.apiVersion === 'v4'
-        ? `${client.first_name || client.name || ''} ${client.last_name || client.lastname || ''}`.trim()
-        : `${client.name || client.first_name || ''} ${client.lastname || client.last_name || ''}`.trim(),
+      full_name: `${client.name || client.first_name || ''} ${client.lastname || client.last_name || ''}`.trim(),
       phone: client.phone,
       total_spent: totalSpent,
       discount: discount
