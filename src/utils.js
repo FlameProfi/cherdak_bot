@@ -21,7 +21,22 @@ function calculateStatus(totalSpent) {
   return { current, next };
 }
 
+function buildBookingRequestMessage(booking) {
+  const safeComment = booking.comment ? booking.comment : '—';
+  const dateTime = booking.date && booking.time ? `${booking.date} ${booking.time}` : booking.date || booking.time || '—';
+  return [
+    `📅 Бронирование #${booking.id}`,
+    `👤 Клиент: ${booking.user_name}`,
+    `📆 Дата и время: ${dateTime}`,
+    `👥 Гостей: ${booking.guests}`,
+    `💬 Комментарий: ${safeComment}`,
+    '',
+    'Нужно обработать заявку.'
+  ].join('\n');
+}
+
 module.exports = {
   LOYALTY_LEVELS,
-  calculateStatus
+  calculateStatus,
+  buildBookingRequestMessage
 };

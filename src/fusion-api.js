@@ -1,6 +1,26 @@
 const axios = require('axios');
 require('dotenv').config();
 
+function formatPhoneForFusion(phone) {
+  if (!phone) return '';
+  const digits = String(phone).replace(/\D/g, '');
+  if (!digits) return '';
+
+  if (digits.length === 11 && digits.startsWith('8')) {
+    return `+7${digits.slice(1)}`;
+  }
+
+  if (digits.length === 10 && digits.startsWith('9')) {
+    return `+7${digits}`;
+  }
+
+  if (digits.length === 11 && digits.startsWith('7')) {
+    return `+${digits}`;
+  }
+
+  return `+${digits}`;
+}
+
 class FusionAPI {
   constructor() {
     this.baseURL = process.env.FUSION_BASE_URL;
@@ -27,7 +47,8 @@ class FusionAPI {
    * Поиск клиента по номеру телефона
    */
   async findClientByPhone(phone) {
-    const cleanPhone = phone.replace(/\D/g, '');
+    const cleanPhone = formatPhoneForFusion(phone);
+    const phoneDigits = String(cleanPhone).replace(/\D/g, '');
     try {
       // Пробуем сначала точечный поиск по телефону
       try {
@@ -43,7 +64,7 @@ class FusionAPI {
           params: { search: cleanPhone }
         });
         const clients = Array.isArray(response.data) ? response.data : (response.data?.data?.items || []);
-        return clients.find(c => (c.phone || '').replace(/\D/g, '') === cleanPhone) || null;
+        return clients.find(c => String(c.phone || '').replace(/\D/g, '') === phoneDigits) || null;
       }
       return null;
     } catch (error) {
@@ -57,6 +78,7 @@ class FusionAPI {
    */
   async createClient(data) {
     const idNetwork = data.id_network !== undefined ? data.id_network : (Number(process.env.FUSION_NETWORK_ID) || 1);
+    const phone = formatPhoneForFusion(data.phone);
 
     try {
       try {
@@ -65,7 +87,7 @@ class FusionAPI {
           id_network: idNetwork,
           name: data.first_name || data.name,
           lastname: data.last_name || data.lastname || '',
-          phone: data.phone,
+          phone,
           id_group: data.id_group || process.env.FUSION_DEFAULT_GROUP_ID || 1
         });
         return response.data?.data || response.data;
@@ -75,7 +97,7 @@ class FusionAPI {
           id_network: idNetwork, // Передаем обязательный ID сети для прохождения валидации
           name: data.first_name || data.name,
           lastname: data.last_name || data.lastname || '',
-          phone: data.phone,
+          phone,
           gender: data.gender || 'male',
           id_group: data.id_group || process.env.FUSION_DEFAULT_GROUP_ID || 1
         });
@@ -155,4 +177,6 @@ class FusionAPI {
   }
 }
 
-module.exports = new FusionAPI();
+const fusionAPI = new FusionAPI();
+fusionAPI.formatPhoneForFusion = formatPhoneForFusion;
+module.exports = fusionAPI;
