@@ -380,7 +380,7 @@ bot.hears('🤝 Пригласить друга', async (ctx) => {
 });
 
 bot.command('admin_stats', (ctx) => {
-  if (ctx.from.id.toString() !== process.env.ADMIN_TG_ID) return;
+  if (!isAdmin(ctx)) return;
   const users = db.getAllUsers();
   const stats = users.reduce((acc, u) => {
     acc[u.current_level] = (acc[u.current_level] || 0) + 1;
@@ -394,16 +394,117 @@ bot.command('admin_stats', (ctx) => {
   ctx.reply(response, { parse_mode: 'Markdown' });
 });
 
+async function sendAdminMenuView(ctx) {
+  const items = await db.getMenuItems();
+  if (!items.length) {
+    return ctx.reply('Меню пока пустое. Добавьте позицию командой /admin_add_menu.');
+  }
+
+  let text = '📋 Текущее меню:\n\n';
+  const buttons = [];
+  items.forEach(item => {
+    text += `#${item.id} ${escapeMarkdown(item.name)} — ${item.price}₽\n${escapeMarkdown(item.description)}\n\n`;
+    buttons.push([Markup.button.callback(`Удалить #${item.id}`, `delete_menu_${item.id}`)]);
+  });
+
+  return ctx.reply(text, Markup.inlineKeyboard(buttons).resize(), { parse_mode: 'Markdown' });
+}
+
+async function sendAdminTablesView(ctx) {
+  const tables = await db.getAllTables();
+  if (!tables.length) return ctx.reply('Таблицы не найдены.');
+
+  let text = '🪑 Статусы столов:\n\n';
+  const buttons = [];
+  tables.forEach(table => {
+    text += `${table.code} ${escapeMarkdown(table.label)} — ${table.seats} мест — ${table.status === 'available' ? 'Свободен' : 'Занят'}\n`;
+    buttons.push([
+      Markup.button.callback(`Свободен`, `table_status_${table.code}_available`),
+      Markup.button.callback(`Занят`, `table_status_${table.code}_reserved`)
+    ]);
+  });
+
+  return ctx.reply(text, Markup.inlineKeyboard(buttons).resize(), { parse_mode: 'Markdown' });
+}
+
+async function sendAdminBookingsView(ctx) {
+  const bookings = await db.getAllBookings();
+  if (!bookings.length) return ctx.reply('Бронирований пока нет.');
+
+  let text = '📚 Последние бронирования:\n\n';
+  bookings.slice(0, 20).forEach(booking => {
+    text += `#${booking.id} ${escapeMarkdown(booking.name || 'Гость')} — ${booking.date || '—'} ${booking.time || '—'}\n`;
+    text += `Стол: ${escapeMarkdown(booking.table_code || 'не указан')} | Гостей: ${booking.guests || 0} | Статус: ${escapeMarkdown(booking.status)}\n`;
+    text += `Комментарий: ${escapeMarkdown(booking.comment || '—')}\n\n`;
+  });
+  return ctx.reply(text, { parse_mode: 'Markdown' });
+}
+
 bot.command('admin', async (ctx) => {
   if (!isAdmin(ctx)) return;
-  await ctx.reply(`*Админка Чердак*\n\n` +
-    `/admin_menu — показать меню\n` +
-    `/admin_add_menu — добавить позицию\n` +
-    `/admin_remove_menu — удалить позицию\n` +
-    `/admin_bookings — последние бронирования\n` +
-    `/admin_tables — статус столов\n` +
-    `/admin_create_booking — создать бронь вручную\n` +
-    `/admin_stats — статистика пользователей`, { parse_mode: 'Markdown' });
+  await ctx.reply('*Админка Чердак*', Markup.inlineKeyboard([
+    [Markup.button.callback('📝 Меню', 'admin_menu')],
+    [Markup.button.callback('➕ Добавить позицию', 'admin_add_menu')],
+    [Markup.button.callback('❌ Удалить позицию', 'admin_remove_menu')],
+    [Markup.button.callback('📚 Бронирования', 'admin_bookings')],
+    [Markup.button.callback('🪑 Столы', 'admin_tables')],
+    [Markup.button.callback('🛠️ Создать бронь', 'admin_create_booking')],
+    [Markup.button.callback('📊 Статистика', 'admin_stats')]
+  ]).resize(), { parse_mode: 'Markdown' });
+});
+
+bot.action('admin_menu', async (ctx) => {
+  if (!isAdmin(ctx)) return ctx.answerCbQuery('Только админ.');
+  await ctx.answerCbQuery();
+  return sendAdminMenuView(ctx);
+});
+
+bot.action('admin_add_menu', async (ctx) => {
+  if (!isAdmin(ctx)) return ctx.answerCbQuery('Только админ.');
+  await ctx.answerCbQuery();
+  ctx.session = ctx.session || {};
+  ctx.session.adminFlow = { type: 'add_menu', step: 'name', data: {} };
+  return ctx.reply('Введите название новой позиции меню.');
+});
+
+bot.action('admin_remove_menu', async (ctx) => {
+  if (!isAdmin(ctx)) return ctx.answerCbQuery('Только админ.');
+  await ctx.answerCbQuery();
+  const items = await db.getMenuItems();
+  if (!items.length) return ctx.reply('Меню пустое.');
+
+  let text = 'Выберите позицию для удаления:\n\n';
+  const buttons = items.map(item => [Markup.button.callback(`Удалить #${item.id}`, `delete_menu_${item.id}`)]);
+  items.forEach(item => {
+    text += `#${item.id} ${escapeMarkdown(item.name)} — ${item.price}₽\n`;
+  });
+  return ctx.reply(text, Markup.inlineKeyboard(buttons).resize(), { parse_mode: 'Markdown' });
+});
+
+bot.action('admin_bookings', async (ctx) => {
+  if (!isAdmin(ctx)) return ctx.answerCbQuery('Только админ.');
+  await ctx.answerCbQuery();
+  return sendAdminBookingsView(ctx);
+});
+
+bot.action('admin_tables', async (ctx) => {
+  if (!isAdmin(ctx)) return ctx.answerCbQuery('Только админ.');
+  await ctx.answerCbQuery();
+  return sendAdminTablesView(ctx);
+});
+
+bot.action('admin_create_booking', async (ctx) => {
+  if (!isAdmin(ctx)) return ctx.answerCbQuery('Только админ.');
+  await ctx.answerCbQuery();
+  ctx.session = ctx.session || {};
+  ctx.session.adminFlow = { type: 'create_booking', step: 'name', data: {} };
+  return ctx.reply('Создание брони: введите имя гостя.');
+});
+
+bot.action('admin_stats', async (ctx) => {
+  if (!isAdmin(ctx)) return ctx.answerCbQuery('Только админ.');
+  await ctx.answerCbQuery();
+  return sendAdminStatsView(ctx);
 });
 
 bot.command('admin_menu', async (ctx) => {
