@@ -105,7 +105,7 @@ class FusionAPI {
     try {
       console.log(`[FusionAPI] Попытка получить клиента через v1 (ID: ${id})...`);
       const response = await this.client.get(`/api/v1/client/${id}`);
-      
+      console.log(`[FusionAPI] Ответ от v1:`, response.data);
       // Если данные пришли, возвращаем их
       if (response.data) {
         return response.data?.data || response.data;
@@ -134,7 +134,9 @@ class FusionAPI {
   normalizeClient(client) {
     if (!client) return null;
 
-    const totalSpent = client.total_buy_sum || client.sum_orders || 0;
+    // Вытаскиваем сумму из total_money_spent, total_buy_sum или sum_orders
+    // и принудительно переводим в число через Number()
+    const totalSpent = Number(client.total_money_spent || client.total_buy_sum || client.sum_orders || 0);
     
     let discount = 0;
     if (client.discount !== undefined) {
@@ -147,7 +149,7 @@ class FusionAPI {
       id: client.id,
       full_name: `${client.name || client.first_name || ''} ${client.lastname || client.last_name || ''}`.trim(),
       phone: client.phone,
-      total_spent: totalSpent,
+      total_spent: totalSpent, // Теперь здесь всегда будет число, например: 450000
       discount: discount
     };
   }

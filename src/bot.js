@@ -11,15 +11,51 @@ bot.use(session()); // Use session to store temporary registration data
 const mainMenu = Markup.keyboard([
   ['📇 Моя карта'],
   ['📜 Меню', '📅 Забронировать'],
-  ['⭐ Оставить отзыв']
+  ['⭐ Оставить отзыв'],
+  ['🤝 Пригласить друга']
 ]).resize();
 
 bot.start(async (ctx) => {
-  const user = db.getUserByTgId(ctx.from.id);
+  const tgId = ctx.from.id;
+  const user = db.getUserByTgId(tgId);
+
+  // Если пользователь уже есть в нашей базе данных
   if (user) {
     return ctx.reply(`С возвращением, ${user.full_name}!`, mainMenu);
   }
 
+  // Ловим реферальный хвост из ссылки (то, что идет после /start)
+  const startPayload = ctx.payload; 
+  let referrerId = null;
+
+  // Проверяем: параметр есть, и пригласивший — это не сам пользователь
+  if (startPayload && startPayload !== tgId.toString()) {
+    referrerId = Number(startPayload);
+    // На всякий случай проверяем, что это корректное число и такой пригласитель существует у нас в БД
+    if (isNaN(referrerId) || !db.getUserByTgId(referrerId)) {
+      referrerId = null; 
+    }
+  }
+
+  // Создаем предварительный профиль "Новичка" с привязкой к пригласителю
+  // Телефон и имя обновятся/запишутся на следующих этапах вашей регистрации
+  db.saveUser({
+    telegram_id: tgId,
+    fusion_client_id: null,
+    phone: '',
+    full_name: `${ctx.from.first_name || ''} ${ctx.from.last_name || ''}`.trim() || 'Гость',
+    total_spent: 0,
+    current_level: 'Новичок',
+    referred_by: referrerId, // Сохраняем ID того, кто пригласил
+    is_ref_rewarded: 0       // Бонус пока не выдан (выдадим на вебхуке после покупки)
+  });
+
+  // Отправляем приветственный текст
+  if (referrerId) {
+    await ctx.reply('🎉 Вы зашли по приглашению друга! После вашей первой покупки он получит приятный бонус.');
+  }
+
+  // Запрашиваем телефон (ваша стандартная логика)
   await ctx.reply(
     'Добро пожаловать в систему лояльности! Для регистрации, пожалуйста, поделитесь вашим номером телефона.',
     Markup.keyboard([
@@ -95,6 +131,7 @@ bot.hears('📇 Моя карта', async (ctx) => {
     const rawData = await fusion.getClientDetails(user.fusion_client_id);
     const fusionData = fusion.normalizeClient(rawData);
 
+    // ИСПРАВЛЕНИЕ: Берем нормализованное числовое поле total_spent
     const totalSpent = fusionData ? fusionData.total_spent : user.total_spent;
     const { current, next } = calculateStatus(totalSpent);
 
@@ -107,6 +144,7 @@ bot.hears('📇 Моя карта', async (ctx) => {
     message += `📈 *Всего потрачено:* ${totalSpent} руб.\n\n`;
 
     if (next) {
+      // Математика теперь сработает без ошибок, так как totalSpent — число
       message += `🚀 До статуса *${next.name}* осталось потратить ${next.threshold - totalSpent} руб.`;
     } else {
       message += `👑 У вас максимальный статус!`;
@@ -127,6 +165,21 @@ bot.hears('📇 Моя карта', async (ctx) => {
 bot.hears('📜 Меню', (ctx) => ctx.reply(`Наше меню: ${process.env.MENU_URL}`));
 bot.hears('📅 Забронировать', (ctx) => ctx.reply(`Забронировать: ${process.env.BOOKING_URL}`));
 bot.hears('⭐ Оставить отзыв', (ctx) => ctx.reply(`Отзыв: ${process.env.REVIEW_URL}`));
+bot.hears('🤝 Пригласить друга', async (ctx) => {
+  const tgId = ctx.from.id;
+  const user = db.getUserByTgId(tgId);
+  
+  if (!user) return ctx.reply('Пожалуйста, сначала пройдите регистрацию.');
+
+  const botUsername = ctx.botInfo.username;
+  const refLink = `https://t.me/${botUsername}?start=${tgId}`;
+
+  let msg = `🤝 *Приглашайте друзей и получайте бонусы!*\n\n`;
+  msg += `Отправьте эту ссылку другу. Когда он зарегистрируется и совершит *первую покупку* в Чердаке, вы получите *+1000 руб.* к вашей сумме покупок для быстрого повышения статуса! 📈\n\n`;
+  msg += `🔗 *Ваша ссылка:* \`${refLink}\``;
+
+  await ctx.replyWithMarkdown(msg);
+});
 
 bot.command('admin_stats', (ctx) => {
   if (ctx.from.id.toString() !== process.env.ADMIN_TG_ID) return;
@@ -142,6 +195,7 @@ bot.command('admin_stats', (ctx) => {
   }
   ctx.reply(response, { parse_mode: 'Markdown' });
 });
+
 
 /**
  * Таргетированная рассылка
