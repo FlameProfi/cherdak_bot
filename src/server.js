@@ -107,12 +107,34 @@ function setupWebhook(bot) {
   app.get('/menu', async (req, res) => {
     const reviewUrl = 'https://yandex.ru/maps/-/CTq6aD2X';
     const menuItems = await db.getMenuItems();
-    const menuCards = menuItems.map(item => `
+    const grouped = {};
+    menuItems.forEach(i => {
+      const cat = i.category || 'Без категории';
+      if (!grouped[cat]) grouped[cat] = [];
+      grouped[cat].push(i);
+    });
+
+    const sectionsHtml = Object.keys(grouped).map(cat => {
+      const cards = grouped[cat].map(item => {
+        const imgHtml = item.photo ? `<div class="card-media"><img src="${item.photo}" alt="${item.name}"/></div>` : '';
+        return `
             <div class="card">
+              ${imgHtml}
               <div class="card-title"><strong>${item.name}</strong><span>${item.price} ₽</span></div>
-              <p class="description">${item.description}</p>
+              <p class="description">${item.description || ''}</p>
             </div>
-    `).join('');
+        `;
+      }).join('');
+
+      return `
+        <section class="section">
+          <h2>${cat}</h2>
+          <div class="cards">
+            ${cards}
+          </div>
+        </section>
+      `;
+    }).join('\n');
 
     res.type('html').send(`<!doctype html>
 <html lang="ru">
@@ -143,6 +165,8 @@ function setupWebhook(bot) {
       .section h2 { margin: 0; }
       .cards { display: grid; gap: 16px; }
       .card { background: var(--panel); border: 1px solid var(--line); border-radius: 24px; padding: 22px; display: grid; gap: 10px; }
+      .card-media { width: 100%; display: block; border-radius: 12px; overflow: hidden; }
+      .card-media img { width: 100%; height: 220px; object-fit: cover; display: block; }
       .card-title { display: flex; justify-content: space-between; gap: 16px; align-items: baseline; }
       .card-title strong { font-size: 1.05rem; }
       .card-title span { color: var(--muted); }
@@ -165,12 +189,7 @@ function setupWebhook(bot) {
       </div>
 
       <div class="sections">
-        <section class="section">
-          <h2>Позиции</h2>
-          <div class="cards">
-            ${menuCards}
-          </div>
-        </section>
+        ${sectionsHtml}
       </div>
 
       <div style="margin-top:38px;">
@@ -186,12 +205,16 @@ function setupWebhook(bot) {
     const freeCount = tables.filter(table => table.status === 'available').length;
     const takenCount = tables.length - freeCount;
     const layout = {
-      P1: { left: '8%', top: '14%' },
-      P2: { left: '40%', top: '10%' },
-      P3: { left: '72%', top: '18%' },
-      P4: { left: '16%', top: '58%' },
-      P5: { left: '46%', top: '62%' },
-      L1: { left: '78%', top: '58%' }
+      L1: { left: '24%', top: '17%' },
+      L2: { left: '40%', top: '17%' },
+      L3: { left: '55%', top: '17%' },
+      L4: { left: '70%', top: '17%' },
+      L5: { left: '85%', top: '17%' },
+      P1: { left: '24%', top: '66%' },
+      P2: { left: '40%', top: '66%' },
+      P3: { left: '55%', top: '64%' },
+      P4: { left: '70%', top: '66%' },
+      P5: { left: '85%', top: '66%' }
     };
 
     const tableCards = tables.map(table => {
@@ -285,7 +308,7 @@ function setupWebhook(bot) {
       .status-pill { display: inline-flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 999px; background: #111; border: 1px solid var(--line-soft); font-size: .95rem; }
       .status-pill.available { color: #83e28d; }
       .status-pill.reserved { color: #e25d69; }
-      .plan { position: relative; min-height: 500px; border: 1px solid var(--line); border-radius: 28px; background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01)); overflow: hidden; }
+      .plan { position: relative; min-height: 500px; border: 1px solid rgba(255,255,255,.10); border-radius: 10px; background: #181818; overflow: hidden; }
       .plan::before {
         content: '';
         position: absolute;
@@ -426,10 +449,6 @@ function setupWebhook(bot) {
               </div>
               <div class="sidebar-actions">
                 <button type="button" class="action-button primary" id="open-booking-button" disabled>Забронировать</button>
-                <form id="open-now-form" action="/booking/open" method="post">
-                  <input type="hidden" name="table" id="open-now-table" value="" />
-                  <button type="submit" class="action-button secondary" id="open-now-button" disabled>Открыть (если гости)</button>
-                </form>
               </div>
               <div class="sidebar-note">Пока открыта форма, гости не смогут забронировать этот стол.</div>
               <div class="bookings-panel">
@@ -443,27 +462,6 @@ function setupWebhook(bot) {
         </aside>
 
         <div>
-          <div class="timeline-card">
-            <div class="timeline-row">
-              <span>Забронировать</span>
-              <span>Сегодня</span>
-            </div>
-            <div class="timeline-meta">
-              <span>с <strong>00:50</strong> ч.</span>
-              <span>Время работы: 18:00 - 03:00</span>
-            </div>
-            <div class="timeline-bar">
-              <div class="timeline-track">
-                <span>18:00</span>
-                <span>20:00</span>
-                <span>22:00</span>
-                <span>00:00</span>
-                <span>02:00</span>
-              </div>
-              <div class="timeline-current"></div>
-              <div class="timeline-label">00:50</div>
-            </div>
-          </div>
 
           <div class="map card">
             <h2 class="map-title">Схема зала</h2>
@@ -531,8 +529,6 @@ function setupWebhook(bot) {
       const modalStatus = document.getElementById('modal-status');
       const modalSelectedTable = document.getElementById('modal-selected-table');
       const openBookingButton = document.getElementById('open-booking-button');
-      const openNowButton = document.getElementById('open-now-button');
-      const openNowTableInput = document.getElementById('open-now-table');
       const sidebarSubtitle = document.getElementById('sidebar-subtitle');
       const sidebarStatus = document.getElementById('sidebar-status');
       const sidebarBookingsCount = document.getElementById('sidebar-bookings-count');
@@ -552,8 +548,6 @@ function setupWebhook(bot) {
         sidebarStatus.style.color = status === 'available' ? '#83e28d' : '#e25d69';
         sidebarBookingsCount.textContent = bookings.length + ' ' + (bookings.length === 1 ? 'бронь' : 'броней');
         openBookingButton.disabled = status !== 'available';
-        openNowButton.disabled = status !== 'available';
-        openNowTableInput.value = table;
 
         if (!bookings.length) {
           sidebarBookingList.innerHTML = '<div style="color: var(--muted);">Свободно для бронирования</div>';
@@ -599,73 +593,6 @@ function setupWebhook(bot) {
         if (event.target === modal) modal.classList.remove('open');
       });
     </script>
-
-      let selectedTable = null;
-      let selectedStatus = null;
-      let selectedLabel = null;
-      let selectedSeats = null;
-
-      function renderSidebar(table, status, label, seats) {
-        const bookings = tableBookings[table] || [];
-        const seatWord = seats === '1' ? 'место' : seats <= '4' ? 'места' : 'мест';
-
-        selectedTable = table;
-        selectedStatus = status;
-        selectedLabel = label;
-        selectedSeats = seats;
-
-        sidebarSubtitle.textContent = 'Стол ' + label + ', ' + seats + ' ' + seatWord;
-        sidebarStatus.textContent = status === 'available' ? 'Свободно' : 'Занят';
-        sidebarStatus.style.color = status === 'available' ? '#83e28d' : '#e25d69';
-        sidebarBookingsCount.textContent = bookings.length + ' ' + (bookings.length === 1 ? 'бронь' : 'броней');
-        openBookingButton.disabled = status !== 'available';
-        openNowButton.disabled = status !== 'available';
-        openNowTableInput.value = table;
-
-        if (!bookings.length) {
-          sidebarBookingList.innerHTML = '<div style="color: var(--muted);">Свободно для бронирования</div>';
-          return;
-        }
-
-        sidebarBookingList.innerHTML = bookings.slice(0, 4).map(function(booking) {
-          return '<div class="booking-item">'
-            + '<strong>' + (booking.name || 'Гость') + '</strong>'
-            + '<small>' + (booking.date || '') + ' ' + (booking.time || '') + ' · ' + (booking.guests || 0) + ' гостей</small>'
-            + '<small>' + (booking.comment || 'Комментариев нет') + '</small>'
-            + '</div>';
-        }).join('');
-      }
-
-      function openBookingModal() {
-        if (!selectedTable || selectedStatus !== 'available') return;
-        const seatWord = selectedSeats === '1' ? 'место' : selectedSeats <= '4' ? 'места' : 'мест';
-        modalSelectedTable.value = selectedTable;
-        modalTitle.textContent = 'Стол ' + selectedLabel;
-        modalSubtitle.textContent = 'Выбран стол ' + selectedLabel + ', на ' + selectedSeats + ' ' + seatWord;
-        modalStatus.textContent = 'Свободно';
-        modalStatus.classList.remove('reserved');
-        modalStatus.classList.add('available');
-        modal.classList.add('open');
-      }
-
-      cards.forEach(card => {
-        card.addEventListener('click', event => {
-          event.preventDefault();
-          const table = card.dataset.table;
-          const status = card.dataset.status;
-          const seats = card.dataset.seats;
-          const label = card.dataset.label;
-
-          renderSidebar(table, status, label, seats);
-        });
-      });
-
-      openBookingButton.addEventListener('click', openBookingModal);
-      closeModal.addEventListener('click', () => modal.classList.remove('open'));
-      modal.addEventListener('click', (event) => {
-        if (event.target === modal) modal.classList.remove('open');
-      });
-    </script>
   </body>
 </html>`);
   });
@@ -674,6 +601,13 @@ function setupWebhook(bot) {
     const { name, phone, date, time, guests, comment, table } = req.body;
 
     try {
+      if (table) {
+        const selectedTable = await db.getTableByCode(table);
+        if (!selectedTable || selectedTable.status !== 'available') {
+          return res.status(409).send('Этот стол уже занят. Пожалуйста, выберите другой стол.');
+        }
+      }
+
       const bookingId = await db.saveBooking({
         name: name || null,
         phone: phone || null,
@@ -688,6 +622,7 @@ function setupWebhook(bot) {
       if (table) {
         await db.updateTableStatus(table, 'reserved');
       }
+
 
       const bookingText = [
         `📅 Новая бронь с сайта #${bookingId}`,
@@ -727,33 +662,8 @@ function setupWebhook(bot) {
   });
 
   app.post('/booking/open', express.urlencoded({ extended: false }), async (req, res) => {
-    const { table } = req.body;
-
-    try {
-      const bookingId = await db.saveBooking({
-        name: 'Гости на месте',
-        phone: '—',
-        date: new Date().toISOString().slice(0, 10),
-        time: new Date().toTimeString().slice(0, 5),
-        guests: 0,
-        comment: 'Открыт гостями на месте',
-        table_code: table || null,
-        status: 'walk-in'
-      });
-
-      if (table) {
-        await db.updateTableStatus(table, 'reserved');
-      }
-
-      if (adminChatId) {
-        await bot.telegram.sendMessage(adminChatId, `📌 Стол ${table} открыт гостями (#${bookingId})`);
-      }
-
-      res.redirect('/booking');
-    } catch (error) {
-      console.error('Open now booking error:', error);
-      res.status(500).send('Не удалось открыть стол. Попробуйте позже.');
-    }
+    // Этот эндпоинт больше недоступен. Открытие стола доступно только администратору через Telegram команду /open_table
+    return res.status(403).send('Доступ запрещён. Открыть стол может только администратор через Telegram команду /open_table.');
   });
 
   app.post('/webhooks/fusionpos', async (req, res) => {
