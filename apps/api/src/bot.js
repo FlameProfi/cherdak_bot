@@ -2,6 +2,7 @@ const { Telegraf, Markup, session } = require('telegraf');
 const QRCode = require('qrcode');
 const db = require('./database');
 const fusion = require('./fusion-api');
+const { roleAllows } = require('./auth');
 const { calculateStatus, LOYALTY_LEVELS, buildBookingRequestMessage } = require('./utils');
 require('dotenv').config();
 
@@ -11,8 +12,81 @@ bot.use(session()); // Use session to store temporary registration data
 const bookingAdminChatId = process.env.ADMIN_CHAT_ID || process.env.ADMIN_TG_ID;
 const bookingRequests = new Map();
 
-function isAdmin(ctx) {
-  return ctx.from && ctx.from.id && ctx.from.id.toString() === process.env.ADMIN_TG_ID;
+async function getTelegramAdmin(ctx) {
+  const telegramId = Number(ctx.from?.id || ctx.chat?.id || 0);
+  if (!telegramId) return null;
+
+  const account = await db.getAdminAccountByTelegramId(telegramId);
+  if (account) return account;
+
+  if (process.env.ADMIN_TG_ID && telegramId.toString() === process.env.ADMIN_TG_ID) {
+    return {
+      id: 0,
+      username: 'owner',
+      role: 'owner',
+      display_name: 'Основатель',
+      telegram_id: telegramId
+    };
+  }
+
+  return null;
+}
+
+async function hasTelegramRole(ctx, requiredRole = 'host') {
+  const admin = await getTelegramAdmin(ctx);
+  return admin ? roleAllows(admin.role, requiredRole) : false;
+}
+
+async function requireTelegramRole(ctx, requiredRole = 'host', message = 'Только администратор может использовать эту команду.') {
+  const allowed = await hasTelegramRole(ctx, requiredRole);
+  if (!allowed) {
+    if ('answerCbQuery' in ctx && ctx.callbackQuery) {
+      await ctx.answerCbQuery(message);
+    } else {
+      await ctx.reply(message);
+    }
+    return false;
+  }
+
+  return true;
+}
+
+function pickAutomaticTable(tables, guests) {
+  const exactOrLarger = tables
+    .filter((table) => table.seats >= guests)
+    .sort((a, b) => a.seats - b.seats);
+
+  if (exactOrLarger.length) {
+    return exactOrLarger[0];
+  }
+
+  return tables.sort((a, b) => b.seats - a.seats)[0] || null;
+}
+
+function buildBookingAdminKeyboard(bookingId) {
+  return Markup.inlineKeyboard([
+    [
+      Markup.button.callback('✅ Подтвердить', `booking_confirm_${bookingId}`),
+      Markup.button.callback('❌ Отклонить', `booking_reject_${bookingId}`)
+    ]
+  ]);
+}
+
+async function sendBookingToAdminChat(booking) {
+  const message = `${buildBookingRequestMessage({
+    id: booking.id,
+    user_name: booking.user_name || booking.name || 'Клиент',
+    date: booking.date,
+    time: booking.time,
+    guests: booking.guests,
+    comment: booking.comment
+  })}\n📞 Телефон: ${booking.phone || '—'}\n🪑 Стол: ${booking.table_code || 'не указан'}`;
+
+  if (!bookingAdminChatId) return;
+
+  await bot.telegram.sendMessage(bookingAdminChatId, message, {
+    ...buildBookingAdminKeyboard(booking.id)
+  });
 }
 
 function escapeMarkdown(text = '') {
@@ -225,7 +299,9 @@ bot.hears('📅 Забронировать', async (ctx) => {
   ctx.session.booking.step = 'date';
   ctx.session.booking.userName = user.full_name || ctx.from.first_name || 'Клиент';
 
-  await ctx.replyWithMarkdown(`${bookingIntroText}\n\n📅 Шаг 1/4\nВведите дату бронирования в формате *ДД.ММ.ГГГГ*, например *10.07.2026*`);
+  await ctx.replyWithMarkdown(
+    `${bookingIntroText}\n\nℹ️ *Стол в Telegram подберется автоматически по количеству гостей и доступности.*\nЕсли хотите выбрать *конкретный стол*, пожалуйста, оформляйте бронь на сайте.\n\n📅 Шаг 1/4\nВведите дату бронирования в формате *ДД.ММ.ГГГГ*, например *10.07.2026*`
+  );
 });
 
 
@@ -233,14 +309,15 @@ bot.hears('📅 Забронировать', async (ctx) => {
 bot.action(/booking_(confirm|reject)_(\d+)/, async (ctx) => {
   const [, action, bookingId] = ctx.match;
 
-  const isAdmin = ctx.from.id.toString() === process.env.ADMIN_TG_ID || ctx.chat?.id.toString() === bookingAdminChatId;
-  if (!isAdmin) {
-    return ctx.answerCbQuery('Только администратор может обрабатывать заявки.');
+  if (!await requireTelegramRole(ctx, 'host', 'Только администратор может обрабатывать заявки.')) return;
+
+  const bookingData = bookingRequests.get(bookingId) || await db.getBookingById(Number(bookingId));
+  if (!bookingData) {
+    return ctx.answerCbQuery('Эта заявка не найдена.');
   }
 
-  const bookingData = bookingRequests.get(bookingId);
-  if (!bookingData) {
-    return ctx.answerCbQuery('Эта заявка уже обработана или недоступна.');
+  if (bookingData.status && bookingData.status !== 'pending') {
+    return ctx.answerCbQuery(`Заявка уже обработана: ${bookingData.status}`);
   }
 
   const actionText = action === 'confirm' ? 'подтверждена' : 'отклонена';
@@ -248,12 +325,15 @@ bot.action(/booking_(confirm|reject)_(\d+)/, async (ctx) => {
   if (action === 'reject' && bookingData.table_code) {
     await db.updateTableStatus(bookingData.table_code, 'available');
   }
+  await db.syncManagedTableReservations();
   bookingRequests.delete(bookingId);
   await ctx.answerCbQuery(`Заявка ${actionText}`);
   await ctx.editMessageText(`${ctx.update.callback_query.message.text}\n\n🛠️ Статус: ${actionText.toUpperCase()}`);
 
   try {
-    await bot.telegram.sendMessage(bookingData.user_tg_id, `Ваша бронь ${actionText}.`);
+    if (bookingData.user_tg_id || bookingData.telegram_id) {
+      await bot.telegram.sendMessage(bookingData.user_tg_id || bookingData.telegram_id, `Ваша бронь ${actionText}.`);
+    }
   } catch (error) {
     console.error('Booking status notify error:', error);
   }
@@ -276,8 +356,8 @@ bot.hears('🤝 Пригласить друга', async (ctx) => {
   await ctx.replyWithMarkdown(msg);
 });
 
-bot.command('admin_stats', (ctx) => {
-  if (!isAdmin(ctx)) return;
+bot.command('admin_stats', async (ctx) => {
+  if (!await requireTelegramRole(ctx, 'host')) return;
   const users = db.getAllUsers();
   const stats = users.reduce((acc, u) => {
     acc[u.current_level] = (acc[u.current_level] || 0) + 1;
@@ -330,12 +410,12 @@ async function sendAdminTablesView(ctx) {
   tables.forEach(table => {
     text += `${table.code} ${escapeMarkdown(table.label)} — ${table.seats} мест — ${table.status === 'available' ? 'Свободен' : 'Занят'}\n`;
     buttons.push([
-      Markup.button.callback(`Свободен`, `table_status_${table.code}_available`),
-      Markup.button.callback(`Занят`, `table_status_${table.code}_reserved`)
+      Markup.button.callback(`${table.code} → Свободен`, `table_status_${table.code}_available`),
+      Markup.button.callback(`${table.code} → Занят`, `table_status_${table.code}_reserved`)
     ]);
   });
 
-  return ctx.reply(text, Markup.inlineKeyboard(buttons).resize(), { parse_mode: 'Markdown' });
+  return ctx.reply(text, { parse_mode: 'Markdown', ...Markup.inlineKeyboard(buttons).resize() });
 }
 
 async function sendAdminBookingsView(ctx) {
@@ -343,12 +423,22 @@ async function sendAdminBookingsView(ctx) {
   if (!bookings.length) return ctx.reply('Бронирований пока нет.');
 
   let text = '📚 Последние бронирования:\n\n';
+  const buttons = [];
   bookings.slice(0, 20).forEach(booking => {
     text += `#${booking.id} ${escapeMarkdown(booking.name || 'Гость')} — ${booking.date || '—'} ${booking.time || '—'}\n`;
     text += `Стол: ${escapeMarkdown(booking.table_code || 'не указан')} | Гостей: ${booking.guests || 0} | Статус: ${escapeMarkdown(booking.status)}\n`;
     text += `Комментарий: ${escapeMarkdown(booking.comment || '—')}\n\n`;
+    if (booking.status === 'pending') {
+      buttons.push([
+        Markup.button.callback(`#${booking.id} ✅`, `booking_confirm_${booking.id}`),
+        Markup.button.callback(`#${booking.id} ❌`, `booking_reject_${booking.id}`)
+      ]);
+    }
   });
-  return ctx.reply(text, { parse_mode: 'Markdown' });
+  return ctx.reply(text, {
+    parse_mode: 'Markdown',
+    ...(buttons.length ? Markup.inlineKeyboard(buttons).resize() : {})
+  });
 }
 
 async function sendAdminStatsView(ctx) {
@@ -366,26 +456,33 @@ async function sendAdminStatsView(ctx) {
 }
 
 bot.command('admin', async (ctx) => {
-  if (!isAdmin(ctx)) return ctx.reply('Только администратор может использовать эту команду.');
-  await ctx.reply('*Админка Чердак*', Markup.inlineKeyboard([
-    [Markup.button.callback('📝 Меню', 'admin_menu')],
-    [Markup.button.callback('➕ Добавить позицию', 'admin_add_menu')],
-    [Markup.button.callback('❌ Удалить позицию', 'admin_remove_menu')],
+  const admin = await getTelegramAdmin(ctx);
+  if (!admin) return ctx.reply('Только администратор может использовать эту команду.');
+
+  const buttons = [
     [Markup.button.callback('📚 Бронирования', 'admin_bookings')],
     [Markup.button.callback('🪑 Столы', 'admin_tables')],
     [Markup.button.callback('🛠️ Создать бронь', 'admin_create_booking')],
     [Markup.button.callback('📊 Статистика', 'admin_stats')]
-  ]).resize(), { parse_mode: 'Markdown' });
+  ];
+
+  if (roleAllows(admin.role, 'admin')) {
+    buttons.unshift([Markup.button.callback('📝 Меню', 'admin_menu')]);
+    buttons.splice(1, 0, [Markup.button.callback('➕ Добавить позицию', 'admin_add_menu')]);
+    buttons.splice(2, 0, [Markup.button.callback('❌ Удалить позицию', 'admin_remove_menu')]);
+  }
+
+  await ctx.reply(`*Админка Чердак*\nРоль: *${escapeMarkdown(admin.role)}*`, Markup.inlineKeyboard(buttons).resize(), { parse_mode: 'Markdown' });
 });
 
 bot.action('admin_menu', async (ctx) => {
-  if (!isAdmin(ctx)) return ctx.answerCbQuery('Только админ.');
+  if (!await requireTelegramRole(ctx, 'admin', 'Только admin или owner.')) return;
   await ctx.answerCbQuery();
   return sendAdminMenuView(ctx);
 });
 
 bot.action('admin_add_menu', async (ctx) => {
-  if (!isAdmin(ctx)) return ctx.answerCbQuery('Только админ.');
+  if (!await requireTelegramRole(ctx, 'admin', 'Только admin или owner.')) return;
   await ctx.answerCbQuery();
   ctx.session = ctx.session || {};
   ctx.session.adminFlow = { type: 'add_menu', step: 'name', data: {} };
@@ -393,7 +490,7 @@ bot.action('admin_add_menu', async (ctx) => {
 });
 
 bot.action('admin_remove_menu', async (ctx) => {
-  if (!isAdmin(ctx)) return ctx.answerCbQuery('Только админ.');
+  if (!await requireTelegramRole(ctx, 'admin', 'Только admin или owner.')) return;
   await ctx.answerCbQuery();
   const items = await db.getMenuItems();
   if (!items.length) return ctx.reply('Меню пустое.');
@@ -407,19 +504,19 @@ bot.action('admin_remove_menu', async (ctx) => {
 });
 
 bot.action('admin_bookings', async (ctx) => {
-  if (!isAdmin(ctx)) return ctx.answerCbQuery('Только админ.');
+  if (!await requireTelegramRole(ctx, 'host', 'Только администратор.')) return;
   await ctx.answerCbQuery();
   return sendAdminBookingsView(ctx);
 });
 
 bot.action('admin_tables', async (ctx) => {
-  if (!isAdmin(ctx)) return ctx.answerCbQuery('Только админ.');
+  if (!await requireTelegramRole(ctx, 'host', 'Только администратор.')) return;
   await ctx.answerCbQuery();
   return sendAdminTablesView(ctx);
 });
 
 bot.action('admin_create_booking', async (ctx) => {
-  if (!isAdmin(ctx)) return ctx.answerCbQuery('Только админ.');
+  if (!await requireTelegramRole(ctx, 'host', 'Только администратор.')) return;
   await ctx.answerCbQuery();
   ctx.session = ctx.session || {};
   ctx.session.adminFlow = { type: 'create_booking', step: 'name', data: {} };
@@ -427,47 +524,47 @@ bot.action('admin_create_booking', async (ctx) => {
 });
 
 bot.action('admin_stats', async (ctx) => {
-  if (!isAdmin(ctx)) return ctx.answerCbQuery('Только админ.');
+  if (!await requireTelegramRole(ctx, 'host', 'Только администратор.')) return;
   await ctx.answerCbQuery();
   return sendAdminStatsView(ctx);
 });
 
 bot.command('admin_menu', async (ctx) => {
-  if (!isAdmin(ctx)) return ctx.reply('Только администратор может использовать эту команду.');
+  if (!await requireTelegramRole(ctx, 'admin', 'Только admin или owner.')) return;
   return sendAdminMenuView(ctx);
 });
 
-bot.command('admin_add_menu', (ctx) => {
-  if (!isAdmin(ctx)) return ctx.reply('Только администратор может использовать эту команду.');
+bot.command('admin_add_menu', async (ctx) => {
+  if (!await requireTelegramRole(ctx, 'admin', 'Только admin или owner.')) return;
   ctx.session = ctx.session || {};
   ctx.session.adminFlow = { type: 'add_menu', step: 'name', data: {} };
   ctx.reply('Введите название новой позицию меню.');
 });
 
 bot.command('admin_remove_menu', async (ctx) => {
-  if (!isAdmin(ctx)) return ctx.reply('Только администратор может использовать эту команду.');
+  if (!await requireTelegramRole(ctx, 'admin', 'Только admin или owner.')) return;
   return sendAdminMenuView(ctx);
 });
 
 bot.command('admin_bookings', async (ctx) => {
-  if (!isAdmin(ctx)) return ctx.reply('Только администратор может использовать эту команду.');
+  if (!await requireTelegramRole(ctx, 'host')) return;
   return sendAdminBookingsView(ctx);
 });
 
 bot.command('admin_tables', async (ctx) => {
-  if (!isAdmin(ctx)) return ctx.reply('Только администратор может использовать эту команду.');
+  if (!await requireTelegramRole(ctx, 'host')) return;
   return sendAdminTablesView(ctx);
 });
 
-bot.command('admin_create_booking', (ctx) => {
-  if (!isAdmin(ctx)) return ctx.reply('Только администратор может использовать эту команду.');
+bot.command('admin_create_booking', async (ctx) => {
+  if (!await requireTelegramRole(ctx, 'host')) return;
   ctx.session = ctx.session || {};
   ctx.session.adminFlow = { type: 'create_booking', step: 'name', data: {} };
   ctx.reply('Создание брони: введите имя гостя.');
 });
 
 bot.action(/delete_menu_(\d+)/, async (ctx) => {
-  if (!isAdmin(ctx)) return ctx.answerCbQuery('Только админ.');
+  if (!await requireTelegramRole(ctx, 'admin', 'Только admin или owner.')) return;
   const itemId = Number(ctx.match[1]);
   await db.removeMenuItem(itemId);
   await ctx.answerCbQuery(`Позиция #${itemId} удалена`);
@@ -475,7 +572,7 @@ bot.action(/delete_menu_(\d+)/, async (ctx) => {
 });
 
 bot.action(/table_status_([A-Z0-9]+)_(available|reserved)/, async (ctx) => {
-  if (!isAdmin(ctx)) return ctx.answerCbQuery('Только админ.');
+  if (!await requireTelegramRole(ctx, 'host', 'Только администратор.')) return;
   const tableCode = ctx.match[1];
   const newStatus = ctx.match[2];
 
@@ -491,7 +588,7 @@ bot.action(/table_status_([A-Z0-9]+)_(available|reserved)/, async (ctx) => {
 
 // Команда для администратора - открыть стол (гости на месте)
 bot.command('open_table', async (ctx) => {
-  if (!isAdmin(ctx)) return ctx.reply('Только администратор может использовать эту команду.');
+  if (!await requireTelegramRole(ctx, 'host')) return;
   
   const tables = await db.getAllTables();
   if (!tables.length) return ctx.reply('Таблицы не найдены.');
@@ -507,7 +604,7 @@ bot.command('open_table', async (ctx) => {
 
 // Обработчик подтверждения открытия стола
 bot.action(/open_table_confirm_([A-Z0-9]+)/, async (ctx) => {
-  if (!isAdmin(ctx)) return ctx.answerCbQuery('Только админ.');
+  if (!await requireTelegramRole(ctx, 'host', 'Только администратор.')) return;
   
   const tableCode = ctx.match[1];
   
@@ -547,7 +644,7 @@ bot.action(/open_table_confirm_([A-Z0-9]+)/, async (ctx) => {
  * Использование: /broadcast_tier [Название уровня|all] Текст сообщения
  */
 bot.command('broadcast_tier', async (ctx) => {
-  if (ctx.from.id.toString() !== process.env.ADMIN_TG_ID) return;
+  if (!await requireTelegramRole(ctx, 'owner', 'Только owner может делать рассылку.')) return;
 
   const args = ctx.message.text.split(' ');
   if (args.length < 3) {
@@ -579,7 +676,7 @@ bot.on('text', async (ctx) => {
   const adminFlow = ctx.session.adminFlow;
   const booking = ctx.session.booking;
 
-  if (adminFlow && isAdmin(ctx)) {
+  if (adminFlow && await hasTelegramRole(ctx, adminFlow.type === 'add_menu' ? 'admin' : 'host')) {
     if (adminFlow.type === 'add_menu') {
       if (adminFlow.step === 'name') {
         adminFlow.data.name = text.trim();
@@ -655,15 +752,17 @@ bot.on('text', async (ctx) => {
           status: 'pending'
         };
         if (bookingData.table_code) {
-          const table = await db.getTableByCode(bookingData.table_code);
-          if (!table || table.status !== 'available') {
-            return ctx.reply('Этот стол уже занят или не найден. Выберите другой стол.');
+          const conflictingBooking = await db.findConflictingBooking(
+            bookingData.table_code,
+            bookingData.date,
+            bookingData.time
+          );
+          if (conflictingBooking) {
+            return ctx.reply('На это время стол уже забронирован. Выберите другой стол.');
           }
         }
         const bookingId = await db.saveBooking(bookingData);
-        if (adminFlow.data.tableCode) {
-          await db.updateTableStatus(adminFlow.data.tableCode, 'reserved');
-        }
+        await db.syncManagedTableReservations();
         delete ctx.session.adminFlow;
         return ctx.reply(`Бронь создана: #${bookingId}\nИмя: ${bookingData.name}\nДата: ${bookingData.date} ${bookingData.time}\nСтол: ${bookingData.table_code || 'не указан'}`);
       }
@@ -690,28 +789,27 @@ bot.on('text', async (ctx) => {
       return ctx.reply('Пожалуйста, введите корректное число гостей.');
     }
 
-    booking.guests = guests;
-    booking.step = 'table';
     const tables = await db.getAllTables();
-    const availableTables = tables.filter(table => table.status === 'available');
-    if (!availableTables.length) {
+    const availableForRequestedTime = [];
+
+    for (const table of tables) {
+      const conflictingBooking = await db.findConflictingBooking(table.code, booking.date, booking.time);
+      if (!conflictingBooking) {
+        availableForRequestedTime.push(table);
+      }
+    }
+
+    const selectedTable = pickAutomaticTable(availableForRequestedTime, guests);
+    if (!selectedTable) {
       return ctx.reply('Свободных столов сейчас нет. Попробуйте позже или свяжитесь с администратором.');
     }
-    const tableList = availableTables.map(table => `${table.code} (${table.seats} мест)`).join(', ');
-    return ctx.reply(`Выберите стол: ${tableList}\nВведите код стола, например P1.`);
-    return ctx.replyWithMarkdown('💬 Шаг 4/4\nДобавьте комментарий к броням или отправьте *-* если комментария нет');
-  }
 
-  if (booking.step === 'table') {
-    const tableCode = text.trim().toUpperCase();
-    const table = await db.getTableByCode(tableCode);
-    if (!table || table.status !== 'available') {
-      return ctx.reply('Этот стол уже занят или не найден. Введите код свободного стола.');
-    }
-
-    booking.table_code = tableCode;
+    booking.guests = guests;
+    booking.table_code = selectedTable.code;
     booking.step = 'comment';
-    return ctx.replyWithMarkdown('Шаг 5/5\nДобавьте комментарий к брони или отправьте *-* если комментария нет');
+    return ctx.replyWithMarkdown(
+      `🪑 Мы автоматически подобрали стол *${escapeMarkdown(selectedTable.label)}* на *${selectedTable.seats} мест*.\nЕсли нужен конкретный стол, пожалуйста, оформите бронь на сайте.\n\n💬 Шаг 4/4\nДобавьте комментарий к брони или отправьте *-* если комментария нет`
+    );
   }
 
   if (booking.step === 'comment') {
@@ -727,13 +825,14 @@ bot.on('text', async (ctx) => {
       comment: booking.comment,
       status: 'pending'
     });
-    await db.updateTableStatus(booking.table_code, 'reserved');
+    await db.syncManagedTableReservations();
     booking.user_name = booking.userName || ctx.from.first_name || 'Клиент';
 
     bookingRequests.set(String(booking.id), {
       id: booking.id,
       user_tg_id: ctx.from.id,
       user_name: booking.user_name,
+      phone: null,
       date: booking.date,
       time: booking.time,
       guests: booking.guests,
@@ -741,19 +840,18 @@ bot.on('text', async (ctx) => {
       comment: booking.comment
     });
 
-    const message = `${buildBookingRequestMessage(booking)}\nTable: ${booking.table_code}`;
-    const keyboard = Markup.inlineKeyboard([
-      Markup.button.callback('✅ Подтвердить', `booking_confirm_${booking.id}`),
-      Markup.button.callback('❌ Отклонить', `booking_reject_${booking.id}`)
-    ]);
-
     try {
-      if (bookingAdminChatId) {
-        await bot.telegram.sendMessage(bookingAdminChatId, message, {
-          parse_mode: 'Markdown',
-          ...keyboard
-        });
-      }
+      await sendBookingToAdminChat({
+        id: booking.id,
+        user_tg_id: ctx.from.id,
+        user_name: booking.user_name,
+        phone: null,
+        date: booking.date,
+        time: booking.time,
+        guests: booking.guests,
+        table_code: booking.table_code,
+        comment: booking.comment
+      });
       await ctx.reply('✅ Ваша заявка отправлена в админскую беседу. Ожидайте обработки. Мы скоро свяжемся с вами.');
     } catch (error) {
       console.error('Booking notify error:', error);

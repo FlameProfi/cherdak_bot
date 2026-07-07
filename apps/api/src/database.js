@@ -1,8 +1,9 @@
 ﻿const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
+const { hashPassword, verifyPassword } = require('./auth');
 
-const dbDir = path.resolve(__dirname, '../data');
+const dbDir = path.resolve(__dirname, '../../../data');
 if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
 }
@@ -10,6 +11,7 @@ if (!fs.existsSync(dbDir)) {
 const dbPath = path.resolve(dbDir, 'loyalty.db');
 const db = new sqlite3.Database(dbPath);
 const TABLE_HOLD_MS = 2 * 60 * 60 * 1000;
+const BOOKING_LOCK_LEAD_MS = 60 * 60 * 1000;
 // const TABLE_HOLD_MS = 60;
 
 
@@ -40,6 +42,48 @@ function getAsync(sql, params = []) {
   });
 }
 
+function parseBookingDateTime(dateValue, timeValue) {
+  if (!dateValue || !timeValue) return null;
+
+  const normalizedTime = String(timeValue).slice(0, 5);
+  const [hours, minutes] = normalizedTime.split(':').map(Number);
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return null;
+
+  if (String(dateValue).includes('-')) {
+    const [year, month, day] = String(dateValue).split('-').map(Number);
+    if (!year || !month || !day) return null;
+    return new Date(year, month - 1, day, hours, minutes, 0, 0);
+  }
+
+  if (String(dateValue).includes('.')) {
+    const [day, month, year] = String(dateValue).split('.').map(Number);
+    if (!year || !month || !day) return null;
+    return new Date(year, month - 1, day, hours, minutes, 0, 0);
+  }
+
+  return null;
+}
+
+function getBookingWindow(booking) {
+  const start = parseBookingDateTime(booking.date, booking.time);
+  if (!start) return null;
+
+  const startMs = start.getTime();
+  return {
+    startMs,
+    lockAtMs: startMs - BOOKING_LOCK_LEAD_MS,
+    endMs: startMs + TABLE_HOLD_MS
+  };
+}
+
+function isBookingManagedStatus(status) {
+  return ['pending', 'confirmed', 'walk-in'].includes(status);
+}
+
+function windowsOverlap(startA, endA, startB, endB) {
+  return startA < endB && startB < endA;
+}
+
 function initializeDefaults() {
   const defaultTables = [
     { code: 'P1', label: 'P1', seats: 3, status: 'available' },
@@ -64,6 +108,45 @@ function initializeDefaults() {
   for (const table of defaultTables) {
     db.run(`INSERT OR IGNORE INTO tables (code, label, seats, status) VALUES (?, ?, ?, ?)`, [table.code, table.label, table.seats, table.status]);
   }
+
+  const defaultAdminUsername = process.env.ADMIN_USERNAME || 'owner';
+  const defaultAdminPassword = process.env.ADMIN_PASSWORD || 'cherdak123';
+  const defaultAdminRole = process.env.ADMIN_ROLE || 'owner';
+  const defaultAdminName = process.env.ADMIN_DISPLAY_NAME || 'Основатель';
+  const defaultAdminPasswordHash = hashPassword(defaultAdminPassword);
+
+  db.serialize(() => {
+    db.run(
+      `INSERT OR IGNORE INTO admin_accounts (username, password_hash, role, display_name, telegram_id)
+        VALUES (?, ?, ?, ?, ?)`,
+      [
+        defaultAdminUsername,
+        defaultAdminPasswordHash,
+        defaultAdminRole,
+        defaultAdminName,
+        process.env.ADMIN_TG_ID || null
+      ]
+    );
+
+    db.get(
+      `SELECT id, password_hash, telegram_id FROM admin_accounts WHERE username = ?`,
+      [defaultAdminUsername],
+      (err, row) => {
+        if (err || !row) return;
+
+        if (!row.password_hash || !String(row.password_hash).includes(':')) {
+          db.run(
+            `UPDATE admin_accounts
+              SET password_hash = ?, role = COALESCE(role, ?), display_name = COALESCE(display_name, ?), telegram_id = COALESCE(telegram_id, ?)
+              WHERE id = ?`,
+            [defaultAdminPasswordHash, defaultAdminRole, defaultAdminName, process.env.ADMIN_TG_ID || null, row.id]
+          );
+        } else if (!row.telegram_id && process.env.ADMIN_TG_ID) {
+          db.run(`UPDATE admin_accounts SET telegram_id = ? WHERE id = ?`, [process.env.ADMIN_TG_ID, row.id]);
+        }
+      }
+    );
+  });
 
   // Проверим, какие колонки доступны в таблице menu_items и вставим соответствующие поля
   db.all(`PRAGMA table_info(menu_items);`, [], (err, cols) => {
@@ -126,7 +209,8 @@ db.serialize(() => {
       label TEXT,
       seats INTEGER,
       status TEXT DEFAULT 'available',
-      reserved_until TEXT
+      reserved_until TEXT,
+      photo TEXT
     )
   `);
 
@@ -138,6 +222,18 @@ db.serialize(() => {
       description TEXT,
       photo TEXT,
       category TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS admin_accounts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT UNIQUE,
+      password_hash TEXT,
+      role TEXT DEFAULT 'host',
+      display_name TEXT,
+      telegram_id INTEGER,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
@@ -156,8 +252,21 @@ function ensureTableColumns(callback) {
   db.all(`PRAGMA table_info(tables);`, [], (err, rows) => {
     if (err || !rows) return callback && callback();
     const cols = rows.map(r => r.name);
-    if (cols.includes('reserved_until')) return callback && callback();
-    db.run(`ALTER TABLE tables ADD COLUMN reserved_until TEXT;`, [], () => callback && callback());
+    const tasks = [];
+    if (!cols.includes('reserved_until')) {
+      tasks.push(cb => db.run(`ALTER TABLE tables ADD COLUMN reserved_until TEXT;`, [], cb));
+    }
+    if (!cols.includes('photo')) {
+      tasks.push(cb => db.run(`ALTER TABLE tables ADD COLUMN photo TEXT;`, [], cb));
+    }
+    if (!tasks.length) return callback && callback();
+    let i = 0;
+    const next = (er) => {
+      if (er) return callback && callback();
+      if (i >= tasks.length) return callback && callback();
+      tasks[i++](next);
+    };
+    next();
   });
 }
 
@@ -185,12 +294,14 @@ function ensureMenuColumns(callback) {
   });
 }
 
-// После сериализации сначала применим миграцию, затем инициализируем дефолты
-ensureTableColumns(() => {
-  ensureMenuColumns(() => {
-    initializeDefaults();
+function ensureAdminAccountColumns(callback) {
+  db.all(`PRAGMA table_info(admin_accounts);`, [], (err, rows) => {
+    if (err || !rows) return callback && callback();
+    const cols = rows.map(r => r.name);
+    if (cols.includes('telegram_id')) return callback && callback();
+    db.run(`ALTER TABLE admin_accounts ADD COLUMN telegram_id INTEGER;`, [], () => callback && callback());
   });
-});
+}
 
 // Присвоить фото и категории существующим позициям, если они пусты
 function applyDefaultPhotosAndCategories() {
@@ -264,12 +375,98 @@ function getAllUsers() {
   return usersCache;
 }
 
+async function getAdminAccounts() {
+  return await allAsync(
+    'SELECT id, username, role, display_name, telegram_id, created_at FROM admin_accounts ORDER BY created_at ASC'
+  );
+}
+
+async function getAdminAccountByUsername(username) {
+  return await getAsync('SELECT * FROM admin_accounts WHERE username = ?', [username]);
+}
+
+async function getAdminAccountById(id) {
+  return await getAsync(
+    'SELECT id, username, role, display_name, telegram_id, created_at FROM admin_accounts WHERE id = ?',
+    [id]
+  );
+}
+
+async function getAdminAccountByTelegramId(telegramId) {
+  return await getAsync(
+    'SELECT id, username, role, display_name, telegram_id, created_at FROM admin_accounts WHERE telegram_id = ?',
+    [telegramId]
+  );
+}
+
+async function createAdminAccount({ username, password, role, display_name, telegram_id = null }) {
+  const result = await runAsync(
+    `INSERT INTO admin_accounts (username, password_hash, role, display_name, telegram_id)
+      VALUES (?, ?, ?, ?, ?)`,
+    [username, hashPassword(password), role, display_name || null, telegram_id]
+  );
+
+  return getAdminAccountById(result.lastID);
+}
+
+async function updateAdminAccount(id, fields) {
+  const updates = [];
+  const params = [];
+
+  if (Object.prototype.hasOwnProperty.call(fields, 'username')) {
+    updates.push('username = ?');
+    params.push(fields.username);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(fields, 'role')) {
+    updates.push('role = ?');
+    params.push(fields.role);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(fields, 'display_name')) {
+    updates.push('display_name = ?');
+    params.push(fields.display_name);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(fields, 'telegram_id')) {
+    updates.push('telegram_id = ?');
+    params.push(fields.telegram_id);
+  }
+
+  if (fields.password) {
+    updates.push('password_hash = ?');
+    params.push(hashPassword(fields.password));
+  }
+
+  if (!updates.length) return getAdminAccountById(id);
+
+  params.push(id);
+  await runAsync(`UPDATE admin_accounts SET ${updates.join(', ')} WHERE id = ?`, params);
+  return getAdminAccountById(id);
+}
+
+async function authenticateAdmin(username, password) {
+  const account = await getAdminAccountByUsername(username);
+  if (!account) return null;
+  if (!verifyPassword(password, account.password_hash)) return null;
+  return {
+    id: account.id,
+    username: account.username,
+    role: account.role,
+    display_name: account.display_name,
+    telegram_id: account.telegram_id,
+    created_at: account.created_at
+  };
+}
+
 async function getAllTables() {
+  await syncManagedTableReservations();
   await releaseExpiredTables();
   return await allAsync('SELECT * FROM tables ORDER BY code');
 }
 
 async function getTableByCode(code) {
+  await syncManagedTableReservations();
   await releaseExpiredTables();
   return await getAsync('SELECT * FROM tables WHERE code = ?', [code]);
 }
@@ -280,6 +477,135 @@ async function updateTableStatus(code, status, options = {}) {
     : null;
   await runAsync('UPDATE tables SET status = ?, reserved_until = ? WHERE code = ?', [status, reservedUntil, code]);
   return getTableByCode(code);
+}
+
+async function updateTableDetails(code, payload = {}) {
+  const fields = [];
+  const params = [];
+
+  if (Object.prototype.hasOwnProperty.call(payload, 'status')) {
+    const reservedUntil = payload.status === 'reserved'
+      ? payload.reservedUntil || new Date(Date.now() + TABLE_HOLD_MS).toISOString()
+      : null;
+    fields.push('status = ?', 'reserved_until = ?');
+    params.push(payload.status, reservedUntil);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, 'photo')) {
+    fields.push('photo = ?');
+    params.push(payload.photo || null);
+  }
+
+  if (!fields.length) {
+    return getTableByCode(code);
+  }
+
+  params.push(code);
+  await runAsync(`UPDATE tables SET ${fields.join(', ')} WHERE code = ?`, params);
+  return getTableByCode(code);
+}
+
+async function findConflictingBooking(tableCode, date, time, excludeBookingId = null) {
+  const requestedWindow = getBookingWindow({ date, time });
+  if (!requestedWindow) return null;
+
+  const table = await getAsync('SELECT * FROM tables WHERE code = ?', [tableCode]);
+  if (
+    table &&
+    table.status === 'reserved' &&
+    table.reserved_until &&
+    windowsOverlap(requestedWindow.startMs, requestedWindow.endMs, Date.now(), new Date(table.reserved_until).getTime())
+  ) {
+    return {
+      id: 0,
+      table_code: tableCode,
+      date,
+      time,
+      status: 'reserved'
+    };
+  }
+
+  const bookings = await allAsync(
+    `SELECT * FROM bookings
+      WHERE table_code = ?
+        AND status IN ('pending', 'confirmed', 'walk-in')
+        ${excludeBookingId ? 'AND id != ?' : ''}
+      ORDER BY created_at DESC`,
+    excludeBookingId ? [tableCode, excludeBookingId] : [tableCode]
+  );
+
+  return (
+    bookings.find((booking) => {
+      const bookingWindow = getBookingWindow(booking);
+      if (!bookingWindow) return false;
+      return windowsOverlap(
+        requestedWindow.startMs,
+        requestedWindow.endMs,
+        bookingWindow.startMs,
+        bookingWindow.endMs
+      );
+    }) || null
+  );
+}
+
+async function syncManagedTableReservations() {
+  const now = Date.now();
+  const [tables, bookings] = await Promise.all([
+    allAsync('SELECT * FROM tables ORDER BY code'),
+    allAsync(`SELECT * FROM bookings WHERE table_code IS NOT NULL AND status IN ('pending', 'confirmed', 'walk-in')`)
+  ]);
+
+  for (const table of tables) {
+    const tableBookings = bookings
+      .filter((booking) => booking.table_code === table.code && isBookingManagedStatus(booking.status))
+      .map((booking) => ({ booking, window: getBookingWindow(booking) }))
+      .filter((entry) => entry.window);
+
+    const activeBooking = tableBookings.find(({ window }) => (
+      now >= window.lockAtMs && now < window.endMs
+    ));
+
+    if (activeBooking) {
+      const desiredUntil = new Date(activeBooking.window.endMs).toISOString();
+      if (table.status !== 'reserved' || table.reserved_until !== desiredUntil) {
+        await runAsync(
+          'UPDATE tables SET status = ?, reserved_until = ? WHERE code = ?',
+          ['reserved', desiredUntil, table.code]
+        );
+        table.status = 'reserved';
+        table.reserved_until = desiredUntil;
+      }
+      continue;
+    }
+
+    const futureBooking = tableBookings
+      .filter(({ window }) => now < window.lockAtMs)
+      .sort((left, right) => left.window.startMs - right.window.startMs)[0];
+
+    if (
+      futureBooking &&
+      table.status === 'reserved' &&
+      table.reserved_until &&
+      new Date(table.reserved_until).getTime() > now
+    ) {
+      await runAsync(
+        'UPDATE tables SET status = ?, reserved_until = ? WHERE code = ?',
+        ['available', null, table.code]
+      );
+      table.status = 'available';
+      table.reserved_until = null;
+      continue;
+    }
+
+    if (table.status === 'reserved' && (!table.reserved_until || new Date(table.reserved_until).getTime() <= now)) {
+      await runAsync(
+        'UPDATE tables SET status = ?, reserved_until = ? WHERE code = ?',
+        ['available', null, table.code]
+      );
+      table.status = 'available';
+      table.reserved_until = null;
+    }
+  }
 }
 
 async function releaseExpiredTables() {
@@ -396,9 +722,18 @@ module.exports = {
   getUserByFusionId,
   saveUser,
   getAllUsers,
+  getAdminAccounts,
+  getAdminAccountByTelegramId,
+  getAdminAccountByUsername,
+  createAdminAccount,
+  updateAdminAccount,
+  authenticateAdmin,
   getAllTables,
   getTableByCode,
   updateTableStatus,
+  updateTableDetails,
+  findConflictingBooking,
+  syncManagedTableReservations,
   releaseExpiredTables,
   getMenuItems,
   addMenuItem,
